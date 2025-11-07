@@ -1,0 +1,16 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: trellomirror-frontend
+    ports:
+      - "3000:80"
+
+    restart: unless-stopped
+
+
+networks:
+  default:
+    name: trellomirror
+
