@@ -1,0 +1,40 @@
+Cahier des charges — Application de gestion de tâches collaborative
+
+Gestion des utilisateurs
+- Création de compte (inscription)
+- Connexion / déconnexion
+- Gestion sécurisée des mots de passe (hashage via bcrypt)
+- Persistance de la session utilisateur avec token JWT
+- Vérification automatique du token pour les routes protégées
+
+Table (Boards)
+- Création d’une table
+- Renommage d’une table
+- Suppression d’une table
+- Visualisation de tous les tableaux de l’utilisateur connecté
+
+⚙️ Interface et expérience utilisateur
+- Interface développée en React.js avec TailwindCSS
+- Système de drag & drop fluide (react-beautiful-dnd)
+- Design clair, moderne et responsive (desktop + mobile)
+- Feedback visuel lors des actions (ajout, suppression, déplacement, erreurs)
+
+💾 Données et persistance
+- Back-end développé en Go (Golang) avec le framework Gin ou Fiber
+- Sauvegarde des données via une API REST
+- Utilisation d’une base de données PostgreSQL (gérée via GORM ou sqlc)
+- Gestion des relations entre utilisateurs, tableaux, listes et cartes
+- Validation et sérialisation des entrées (via structs Go + tags JSON)
+
+🚀 Déploiement
+- Front-end déployé sur Vercel ou Netlify
+- Back-end Go hébergé sur Railway, Render ou Fly.io
+- Base de données PostgreSQL hébergée sur Supabase ou Neon.tech
+- Configuration d’un pipeline CI/CD (tests, build, déploiement automatique)
+
+🔐 Sécurité et bonnes pratiques
+- Hashage des mots de passe avec bcrypt
+- Utilisation de tokens JWT courts + refresh tokens
+- Protection CORS et rate limiting
+- Variables d’environnement pour les clés et secrets
+- Tests unitaires et d’intégration sur les endpoints Go
