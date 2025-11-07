@@ -1,5 +1,16 @@
 import { useEffect, useState } from 'react';
 import './App.css';
+import LogoLoop from './components/LogoLoop';
+import {
+  VisaLogo,
+  CoinbaseLogo,
+  ZoomLogo,
+  StripeLogo,
+  GitHubLogo,
+  MicrosoftLogo,
+  SlackLogo,
+  AtlassianLogo
+} from './components/CompanyLogos';
 
 const boardColumns = [
   {
@@ -47,6 +58,49 @@ const featureHighlights = [
   {
     title: 'Insights at a glance',
     description: 'Surface workloads, blockers, and trends instantly with dashboards driven by live board data.'
+  }
+];
+
+const companyLogos = [
+  { 
+    node: <VisaLogo />,
+    title: 'Visa',
+    href: 'https://www.visa.com'
+  },
+  { 
+    node: <CoinbaseLogo />,
+    title: 'Coinbase',
+    href: 'https://www.coinbase.com'
+  },
+  { 
+    node: <ZoomLogo />,
+    title: 'Zoom',
+    href: 'https://zoom.us'
+  },
+  { 
+    node: <StripeLogo />,
+    title: 'Stripe',
+    href: 'https://stripe.com'
+  },
+  { 
+    node: <GitHubLogo />,
+    title: 'GitHub',
+    href: 'https://github.com'
+  },
+  { 
+    node: <MicrosoftLogo />,
+    title: 'Microsoft',
+    href: 'https://www.microsoft.com'
+  },
+  { 
+    node: <SlackLogo />,
+    title: 'Slack',
+    href: 'https://slack.com'
+  },
+  { 
+    node: <AtlassianLogo />,
+    title: 'Atlassian',
+    href: 'https://www.atlassian.com'
   }
 ];
 
@@ -147,6 +201,24 @@ function App() {
               <button type="button" className="text-link">Learn more →</button>
             </article>
           ))}
+        </section>
+
+        <section className="logo-section">
+          <h2 className="logo-section-title">They trust us</h2>
+          <div className="logo-section-container">
+            <LogoLoop
+              logos={companyLogos}
+              speed={80}
+              direction="left"
+              logoHeight={100}
+              gap={64}
+              pauseOnHover
+              scaleOnHover
+              fadeOut
+              fadeOutColor="var(--color-bg)"
+              ariaLabel="Trusted companies"
+            />
+          </div>
         </section>
 
         <section className="cta" id="pricing">

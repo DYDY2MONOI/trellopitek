@@ -470,6 +470,77 @@
   opacity: 1;
 }
 
+.logo-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  padding: 3rem 0;
+}
+
+.logo-section-title {
+  font-size: clamp(1.5rem, 2.5vw, 2rem);
+  font-weight: 700;
+  margin: 0;
+  color: var(--color-text);
+  opacity: 0.9;
+}
+
+.logo-section-container {
+  width: 100%;
+  max-width: 1200px;
+  padding: 1.5rem 0;
+}
+
+.logo-section-container .logoloop__item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem 2rem;
+  background: var(--color-card);
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
+  transition: transform var(--transition), box-shadow var(--transition);
+  min-width: 180px;
+  height: 120px;
+}
+
+.logo-section-container .logoloop__item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+}
+
+.logo-section-container .logoloop__item img,
+.logo-section-container .logoloop__item svg {
+  max-width: 180px;
+  max-height: 80px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  filter: grayscale(0.3);
+  opacity: 0.8;
+  transition: opacity var(--transition), filter var(--transition);
+}
+
+.logo-section-container .logoloop__item:hover img,
+.logo-section-container .logoloop__item:hover svg {
+  opacity: 1;
+  filter: grayscale(0);
+}
+
+[data-theme='dark'] .logo-section-container .logoloop__item img,
+[data-theme='dark'] .logo-section-container .logoloop__item svg {
+  filter: grayscale(0.2) brightness(1.1);
+  opacity: 0.9;
+}
+
+[data-theme='dark'] .logo-section-container .logoloop__item:hover img,
+[data-theme='dark'] .logo-section-container .logoloop__item:hover svg {
+  filter: grayscale(0) brightness(1.2);
+  opacity: 1;
+}
+
 @media (max-width: 960px) {
   .topbar {
     padding: 1.25rem 2rem;
@@ -513,5 +584,13 @@
   .cta {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .logo-section {
+    padding: 2rem 0;
+  }
+
+  .logo-section-container {
+    padding: 1rem 0;
   }
 }
