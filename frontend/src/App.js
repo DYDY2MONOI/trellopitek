@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import './App.css';
 import LogoLoop from './components/LogoLoop';
+import Login from './components/Login';
+import Register from './components/Register';
 import {
   VisaLogo,
   CoinbaseLogo,
@@ -11,6 +13,7 @@ import {
   SlackLogo,
   AtlassianLogo
 } from './components/CompanyLogos';
+import { getAuthToken, setAuthToken } from './services/api';
 
 const boardColumns = [
   {
@@ -106,10 +109,85 @@ const companyLogos = [
 
 function App() {
   const [theme, setTheme] = useState('light');
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+  const [showLogin, setShowLogin] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : 'light');
   }, [theme]);
+
+  useEffect(() => {
+    // Check for existing token on mount
+    const savedToken = getAuthToken();
+    if (savedToken) {
+      setToken(savedToken);
+      verifyToken(savedToken);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const verifyToken = async (authToken) => {
+    try {
+      const { api } = await import('./services/api');
+      const userData = await api.getMe(authToken);
+      setUser(userData);
+      setIsAuthenticated(true);
+    } catch (error) {
+      // Token is invalid, remove it
+      setAuthToken(null);
+      setToken(null);
+      setIsAuthenticated(false);
+    }
+  };
+
+  const handleLogin = (userData, authToken) => {
+    setUser(userData);
+    setToken(authToken);
+    setIsAuthenticated(true);
+  };
+
+  const handleRegister = (userData, authToken) => {
+    setUser(userData);
+    setToken(authToken);
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    setAuthToken(null);
+    setToken(null);
+    setUser(null);
+    setIsAuthenticated(false);
+  };
+
+  // Show login/register if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="app-shell">
+        <header className="topbar">
+          <div className="brand">
+            <span className="brand-mark" aria-hidden>EP</span>
+            <span className="brand-name">Epitrello</span>
+          </div>
+          <div className="topbar-actions">
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))}
+            >
+              {theme === 'light' ? 'Dark mode' : 'Light mode'}
+            </button>
+          </div>
+        </header>
+        {showLogin ? (
+          <Login onLogin={handleLogin} onSwitchToRegister={() => setShowLogin(false)} />
+        ) : (
+          <Register onRegister={handleRegister} onSwitchToLogin={() => setShowLogin(true)} />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="app-shell">
@@ -132,8 +210,14 @@ function App() {
           >
             {theme === 'light' ? 'Dark mode' : 'Light mode'}
           </button>
-          <button type="button" className="ghost-button">Log in</button>
-          <button type="button" className="primary-button">Sign up free</button>
+          {user && (
+            <span className="user-email" style={{ marginRight: '1rem', opacity: 0.8 }}>
+              {user.email}
+            </span>
+          )}
+          <button type="button" className="ghost-button" onClick={handleLogout}>
+            Log out
+          </button>
         </div>
       </header>
 
