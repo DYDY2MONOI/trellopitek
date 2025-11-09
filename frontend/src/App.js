@@ -110,7 +110,6 @@ const companyLogos = [
 function App() {
   const [theme, setTheme] = useState('light');
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
   const [showLogin, setShowLogin] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
@@ -122,7 +121,6 @@ function App() {
     // Check for existing token on mount
     const savedToken = getAuthToken();
     if (savedToken) {
-      setToken(savedToken);
       verifyToken(savedToken);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -137,26 +135,22 @@ function App() {
     } catch (error) {
       // Token is invalid, remove it
       setAuthToken(null);
-      setToken(null);
       setIsAuthenticated(false);
     }
   };
 
   const handleLogin = (userData, authToken) => {
     setUser(userData);
-    setToken(authToken);
     setIsAuthenticated(true);
   };
 
   const handleRegister = (userData, authToken) => {
     setUser(userData);
-    setToken(authToken);
     setIsAuthenticated(true);
   };
 
   const handleLogout = () => {
     setAuthToken(null);
-    setToken(null);
     setUser(null);
     setIsAuthenticated(false);
   };
@@ -322,9 +316,9 @@ function App() {
       <footer className="footer" id="resources">
         <p>© {new Date().getFullYear()} Epitrello. Inspired by the Kanban method.</p>
         <div className="footer-links">
-          <a href="#">Status</a>
-          <a href="#">Docs</a>
-          <a href="#">Support</a>
+          <a href="/status">Status</a>
+          <a href="/docs">Docs</a>
+          <a href="/support">Support</a>
         </div>
       </footer>
     </div>

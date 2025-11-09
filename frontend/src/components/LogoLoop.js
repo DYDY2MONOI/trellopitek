@@ -10,7 +10,7 @@ const ANIMATION_CONFIG = {
 
 const toCssLength = value => (typeof value === 'number' ? `${value}px` : (value ?? undefined));
 
-const useResizeObserver = (callback, elements, dependencies) => {
+const useResizeObserver = (callback, elements = [], logos, gap, logoHeight) => {
   useEffect(() => {
     if (!window.ResizeObserver) {
       const handleResize = () => callback();
@@ -28,10 +28,10 @@ const useResizeObserver = (callback, elements, dependencies) => {
     return () => {
       observers.forEach(observer => observer?.disconnect());
     };
-  }, dependencies);
+  }, [callback, elements, logos, gap, logoHeight]);
 };
 
-const useImageLoader = (seqRef, onLoad, dependencies) => {
+const useImageLoader = (seqRef, onLoad, logos, gap, logoHeight) => {
   useEffect(() => {
     const images = seqRef.current?.querySelectorAll('img') ?? [];
     if (images.length === 0) {
@@ -60,7 +60,7 @@ const useImageLoader = (seqRef, onLoad, dependencies) => {
         img.removeEventListener('error', handleImageLoad);
       });
     };
-  }, dependencies);
+  }, [seqRef, onLoad, logos, gap, logoHeight]);
 };
 
 const useAnimationLoop = (trackRef, targetVelocity, seqWidth, isHovered, pauseOnHover) => {
@@ -143,9 +143,13 @@ export const LogoLoop = memo(
         setCopyCount(Math.max(ANIMATION_CONFIG.MIN_COPIES, copiesNeeded));
       }
     }, []);
+    const observedElements = useMemo(() => [containerRef, seqRef], [containerRef, seqRef]);
 
-    useResizeObserver(updateDimensions, [containerRef, seqRef], [logos, gap, logoHeight]);
-    useImageLoader(seqRef, updateDimensions, [logos, gap, logoHeight]);
+    useResizeObserver(updateDimensions, observedElements, logos, gap, logoHeight);
+    useImageLoader(seqRef, updateDimensions, logos, gap, logoHeight);
+    useEffect(() => {
+      updateDimensions();
+    }, [logos, gap, logoHeight, updateDimensions]);
     useAnimationLoop(trackRef, targetVelocity, seqWidth, isHovered, pauseOnHover);
 
     const cssVariables = useMemo(
@@ -210,7 +214,7 @@ export const LogoLoop = memo(
       );
 
       return (
-        <li className="logoloop__item" key={key} role="listitem">
+        <li className="logoloop__item" key={key}>
           {itemContent}
         </li>
       );
@@ -222,7 +226,6 @@ export const LogoLoop = memo(
           <ul
             className="logoloop__list"
             key={`copy-${copyIndex}`}
-            role="list"
             aria-hidden={copyIndex > 0}
             ref={copyIndex === 0 ? seqRef : undefined}
           >
@@ -262,4 +265,3 @@ export const LogoLoop = memo(
 LogoLoop.displayName = 'LogoLoop';
 
 export default LogoLoop;
-

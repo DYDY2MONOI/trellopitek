@@ -33,7 +33,6 @@ func InitDB() (*sql.DB, error) {
 		return nil, err
 	}
 
-	// Create users table
 	createTableSQL := `
 	CREATE TABLE IF NOT EXISTS users (
 		id SERIAL PRIMARY KEY,
