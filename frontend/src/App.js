@@ -14,6 +14,8 @@ import {
   AtlassianLogo
 } from './components/CompanyLogos';
 import { getAuthToken, setAuthToken } from './services/api';
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
+import BoardsPage from './pages/BoardsPage';
 
 const boardColumns = [
   {
@@ -64,6 +66,14 @@ const featureHighlights = [
   }
 ];
 
+const THEME_STORAGE_KEY = 'trellomirror-theme';
+
+const getStoredTheme = () => {
+  if (typeof window === 'undefined') return 'light';
+  const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+  return stored === 'dark' ? 'dark' : 'light';
+};
+
 const companyLogos = [
   { 
     node: <VisaLogo />,
@@ -108,19 +118,53 @@ const companyLogos = [
 ];
 
 function App() {
-  const [theme, setTheme] = useState('light');
+  const [theme, setTheme] = useState(() => getStoredTheme());
   const [user, setUser] = useState(null);
-  const [showLogin, setShowLogin] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authView, setAuthView] = useState(null);
+  const [columns] = useState(boardColumns);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : 'light');
+    const nextTheme = theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', nextTheme);
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+    } catch (error) {
+      // Ignore storage errors (e.g., private mode)
+    }
   }, [theme]);
+
+  // Decode JWT payload without verifying signature (UI convenience)
+  const decodeJwt = (token) => {
+    try {
+      const base64Url = token.split('.')[1];
+      if (!base64Url) return null;
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch (e) {
+      return null;
+    }
+  };
 
   useEffect(() => {
     // Check for existing token on mount
     const savedToken = getAuthToken();
     if (savedToken) {
+      // Optimistically set user from token claims so the session persists visually on reload
+      const claims = decodeJwt(savedToken);
+      if (claims && claims.email) {
+        setUser({ id: claims.user_id, email: claims.email });
+        setIsAuthenticated(true);
+      }
+      // Verify with server to ensure the token is still valid
       verifyToken(savedToken);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -133,30 +177,38 @@ function App() {
       setUser(userData);
       setIsAuthenticated(true);
     } catch (error) {
-      // Token is invalid, remove it
-      setAuthToken(null);
-      setIsAuthenticated(false);
+      // Only clear token on explicit unauthorized responses
+      if (error?.status === 401 || error?.status === 403) {
+        setAuthToken(null);
+        setIsAuthenticated(false);
+      }
     }
   };
 
   const handleLogin = (userData, authToken) => {
     setUser(userData);
     setIsAuthenticated(true);
+    setAuthView(null);
   };
 
   const handleRegister = (userData, authToken) => {
     setUser(userData);
     setIsAuthenticated(true);
+    setAuthView(null);
   };
 
   const handleLogout = () => {
     setAuthToken(null);
     setUser(null);
     setIsAuthenticated(false);
+    setAuthView('login');
   };
 
-  // Show login/register if not authenticated
-  if (!isAuthenticated) {
+  const openLoginPage = () => setAuthView('login');
+  const openRegisterPage = () => setAuthView('register');
+  const closeAuthPage = () => setAuthView(null);
+
+  if (!isAuthenticated && authView) {
     return (
       <div className="app-shell">
         <header className="topbar">
@@ -164,6 +216,13 @@ function App() {
             <span className="brand-mark" aria-hidden>EP</span>
             <span className="brand-name">Epitrello</span>
           </div>
+          <nav className="nav-links">
+            <Link to="/boards" className="ghost-button" style={{ textDecoration: 'none' }}>Boards</Link>
+            <a href="#product">Product</a>
+            <a href="#solutions">Solutions</a>
+            <a href="#pricing">Pricing</a>
+            <a href="#resources">Resources</a>
+          </nav>
           <div className="topbar-actions">
             <button
               type="button"
@@ -172,13 +231,18 @@ function App() {
             >
               {theme === 'light' ? 'Dark mode' : 'Light mode'}
             </button>
+            <button type="button" className="ghost-button" onClick={closeAuthPage}>
+              Back to site
+            </button>
           </div>
         </header>
-        {showLogin ? (
-          <Login onLogin={handleLogin} onSwitchToRegister={() => setShowLogin(false)} />
-        ) : (
-          <Register onRegister={handleRegister} onSwitchToLogin={() => setShowLogin(true)} />
-        )}
+        <main className="auth-page">
+          {authView === 'login' ? (
+            <Login onLogin={handleLogin} onSwitchToRegister={openRegisterPage} />
+          ) : (
+            <Register onRegister={handleRegister} onSwitchToLogin={openLoginPage} />
+          )}
+        </main>
       </div>
     );
   }
@@ -191,6 +255,7 @@ function App() {
           <span className="brand-name">Epitrello</span>
         </div>
         <nav className="nav-links">
+          <Link to="/boards" className="ghost-button" style={{ textDecoration: 'none' }}>Boards</Link>
           <a href="#product">Product</a>
           <a href="#solutions">Solutions</a>
           <a href="#pricing">Pricing</a>
@@ -204,17 +269,33 @@ function App() {
           >
             {theme === 'light' ? 'Dark mode' : 'Light mode'}
           </button>
-          {user && (
-            <span className="user-email" style={{ marginRight: '1rem', opacity: 0.8 }}>
-              {user.email}
-            </span>
+          {isAuthenticated ? (
+            <>
+              {user && (
+                <span className="user-email" style={{ marginRight: '1rem', opacity: 0.8 }}>
+                  {user.email}
+                </span>
+              )}
+              <button type="button" className="ghost-button" onClick={handleLogout}>
+                Log out
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="ghost-button" onClick={openLoginPage}>
+                Log in
+              </button>
+              <button type="button" className="primary-button" onClick={openRegisterPage}>
+                Sign up
+              </button>
+            </>
           )}
-          <button type="button" className="ghost-button" onClick={handleLogout}>
-            Log out
-          </button>
         </div>
       </header>
 
+      {location.pathname.startsWith('/boards') ? (
+        <BoardsPage />
+      ) : (
       <main className="page">
         <section className="hero" id="product">
           <div className="hero-copy">
@@ -225,7 +306,7 @@ function App() {
               and ship faster with a visual workspace inspired by Kanban.
             </p>
             <div className="hero-actions">
-              <button type="button" className="primary-button">Start your board</button>
+              <button type="button" className="primary-button" onClick={() => navigate('/boards')}>Start your board</button>
               <button type="button" className="ghost-button">Watch demo</button>
             </div>
             <div className="hero-meta">
@@ -239,7 +320,7 @@ function App() {
           </div>
           <div className="board-preview" aria-label="Trello style board preview">
             <div className="board">
-              {boardColumns.map((column) => (
+              {columns.map((column) => (
                 <article key={column.title} className={`board-column board-column--${column.accent}`}>
                   <header className="column-header">
                     <span className="column-bullet" />
@@ -312,6 +393,7 @@ function App() {
           </div>
         </section>
       </main>
+      )}
 
       <footer className="footer" id="resources">
         <p>© {new Date().getFullYear()} Epitrello. Inspired by the Kanban method.</p>
@@ -325,4 +407,12 @@ function App() {
   );
 }
 
-export default App;
+export default function AppWithRouter() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/*" element={<App />} />
+      </Routes>
+    </Router>
+  );
+}

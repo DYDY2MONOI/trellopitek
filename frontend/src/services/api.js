@@ -38,19 +38,29 @@ export const api = {
   },
 
   async getMe(token) {
-    const response = await fetch(`${API_URL}/me`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
+    try {
+      const response = await fetch(`${API_URL}/me`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-    if (!response.ok) {
-      throw new Error('Failed to get user info');
+      if (!response.ok) {
+        const err = new Error('Failed to get user info');
+        err.status = response.status;
+        throw err;
+      }
+
+      return response.json();
+    } catch (e) {
+      if (e && typeof e === 'object' && !('status' in e)) {
+        // Network or CORS error; mark with status 0 so callers can decide not to logout
+        e.status = 0;
+      }
+      throw e;
     }
-
-    return response.json();
   },
 };
 
@@ -65,4 +75,3 @@ export const setAuthToken = (token) => {
 export const getAuthToken = () => {
   return localStorage.getItem('token');
 };
-

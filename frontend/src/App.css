@@ -109,6 +109,15 @@
   gap: 4rem;
 }
 
+.auth-page {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 1.5rem;
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.08) 0%, rgba(99, 102, 241, 0.06) 24%, transparent 55%);
+}
+
 .hero {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
