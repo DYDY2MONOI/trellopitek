@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import './App.css';
 import LogoLoop from './components/LogoLoop';
+import BoardTemplatesModal from './components/BoardTemplatesModal';
 import Login from './components/Login';
 import Register from './components/Register';
 import {
@@ -118,8 +119,10 @@ const companyLogos = [
 function App() {
   const [theme, setTheme] = useState(() => getStoredTheme());
   const [user, setUser] = useState(null);
-  const [showLogin, setShowLogin] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authView, setAuthView] = useState(null);
+  const [columns, setColumns] = useState(boardColumns);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   useEffect(() => {
     const nextTheme = theme === 'dark' ? 'dark' : 'light';
@@ -131,10 +134,35 @@ function App() {
     }
   }, [theme]);
 
+  // Decode JWT payload without verifying signature (UI convenience)
+  const decodeJwt = (token) => {
+    try {
+      const base64Url = token.split('.')[1];
+      if (!base64Url) return null;
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch (e) {
+      return null;
+    }
+  };
+
   useEffect(() => {
     // Check for existing token on mount
     const savedToken = getAuthToken();
     if (savedToken) {
+      // Optimistically set user from token claims so the session persists visually on reload
+      const claims = decodeJwt(savedToken);
+      if (claims && claims.email) {
+        setUser({ id: claims.user_id, email: claims.email });
+        setIsAuthenticated(true);
+      }
+      // Verify with server to ensure the token is still valid
       verifyToken(savedToken);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -147,45 +175,74 @@ function App() {
       setUser(userData);
       setIsAuthenticated(true);
     } catch (error) {
-      // Token is invalid, remove it
-      setAuthToken(null);
-      setIsAuthenticated(false);
+      // Only clear token on explicit unauthorized responses
+      if (error?.status === 401 || error?.status === 403) {
+        setAuthToken(null);
+        setIsAuthenticated(false);
+      }
     }
   };
 
   const handleLogin = (userData, authToken) => {
     setUser(userData);
     setIsAuthenticated(true);
+    setAuthView(null);
   };
 
   const handleRegister = (userData, authToken) => {
     setUser(userData);
     setIsAuthenticated(true);
+    setAuthView(null);
   };
 
   const handleLogout = () => {
     setAuthToken(null);
     setUser(null);
     setIsAuthenticated(false);
-    setShowLogin(true);
+    setAuthView('login');
   };
 
-  const scrollToAuthSection = () => {
-    const authSection = document.getElementById('auth-section');
-    if (authSection) {
-      authSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
+  const openLoginPage = () => setAuthView('login');
+  const openRegisterPage = () => setAuthView('register');
+  const closeAuthPage = () => setAuthView(null);
 
-  const handleShowLogin = () => {
-    setShowLogin(true);
-    scrollToAuthSection();
-  };
-
-  const handleShowRegister = () => {
-    setShowLogin(false);
-    scrollToAuthSection();
-  };
+  if (!isAuthenticated && authView) {
+    return (
+      <div className="app-shell">
+        <header className="topbar">
+          <div className="brand">
+            <span className="brand-mark" aria-hidden>EP</span>
+            <span className="brand-name">Epitrello</span>
+          </div>
+          <nav className="nav-links">
+            <a href="#product">Product</a>
+            <a href="#solutions">Solutions</a>
+            <a href="#pricing">Pricing</a>
+            <a href="#resources">Resources</a>
+          </nav>
+          <div className="topbar-actions">
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))}
+            >
+              {theme === 'light' ? 'Dark mode' : 'Light mode'}
+            </button>
+            <button type="button" className="ghost-button" onClick={closeAuthPage}>
+              Back to site
+            </button>
+          </div>
+        </header>
+        <main className="auth-page">
+          {authView === 'login' ? (
+            <Login onLogin={handleLogin} onSwitchToRegister={openRegisterPage} />
+          ) : (
+            <Register onRegister={handleRegister} onSwitchToLogin={openLoginPage} />
+          )}
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="app-shell">
@@ -195,6 +252,7 @@ function App() {
           <span className="brand-name">Epitrello</span>
         </div>
         <nav className="nav-links">
+          <button type="button" className="ghost-button" onClick={() => setShowTemplates(true)}>Boards</button>
           <a href="#product">Product</a>
           <a href="#solutions">Solutions</a>
           <a href="#pricing">Pricing</a>
@@ -221,10 +279,10 @@ function App() {
             </>
           ) : (
             <>
-              <button type="button" className="ghost-button" onClick={handleShowLogin}>
+              <button type="button" className="ghost-button" onClick={openLoginPage}>
                 Log in
               </button>
-              <button type="button" className="primary-button" onClick={handleShowRegister}>
+              <button type="button" className="primary-button" onClick={openRegisterPage}>
                 Sign up
               </button>
             </>
@@ -241,8 +299,8 @@ function App() {
               Build boards that keep every teammate aligned. Capture ideas, automate the busy work,
               and ship faster with a visual workspace inspired by Kanban.
             </p>
-            <div className="hero-actions">
-              <button type="button" className="primary-button">Start your board</button>
+          <div className="hero-actions">
+              <button type="button" className="primary-button" onClick={() => setShowTemplates(true)}>Start your board</button>
               <button type="button" className="ghost-button">Watch demo</button>
             </div>
             <div className="hero-meta">
@@ -256,7 +314,7 @@ function App() {
           </div>
           <div className="board-preview" aria-label="Trello style board preview">
             <div className="board">
-              {boardColumns.map((column) => (
+              {columns.map((column) => (
                 <article key={column.title} className={`board-column board-column--${column.accent}`}>
                   <header className="column-header">
                     <span className="column-bullet" />
@@ -328,15 +386,6 @@ function App() {
             <button type="button" className="ghost-button">Compare plans</button>
           </div>
         </section>
-        {!isAuthenticated && (
-          <section className="auth-section" id="auth-section">
-            {showLogin ? (
-              <Login onLogin={handleLogin} onSwitchToRegister={handleShowRegister} />
-            ) : (
-              <Register onRegister={handleRegister} onSwitchToLogin={handleShowLogin} />
-            )}
-          </section>
-        )}
       </main>
 
       <footer className="footer" id="resources">
@@ -347,6 +396,15 @@ function App() {
           <a href="/support">Support</a>
         </div>
       </footer>
+
+      <BoardTemplatesModal
+        open={showTemplates}
+        onClose={() => setShowTemplates(false)}
+        onSelect={(tpl) => {
+          setColumns(tpl.columns);
+          setShowTemplates(false);
+        }}
+      />
     </div>
   );
 }
