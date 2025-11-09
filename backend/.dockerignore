@@ -1,0 +1,7 @@
+*.db
+*.db-shm
+*.db-wal
+main
+.env
+*.log
+
