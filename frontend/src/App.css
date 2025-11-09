@@ -109,16 +109,13 @@
   gap: 4rem;
 }
 
-.auth-section {
-  padding: 0 3rem 4rem;
+.auth-page {
+  flex: 1;
   display: flex;
+  align-items: center;
   justify-content: center;
-}
-
-.auth-section .auth-container {
-  min-height: auto;
-  padding: 0;
-  background: none;
+  padding: 4rem 1.5rem;
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.08) 0%, rgba(99, 102, 241, 0.06) 24%, transparent 55%);
 }
 
 .hero {

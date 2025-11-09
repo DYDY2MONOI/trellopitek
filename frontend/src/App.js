@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import './App.css';
 import LogoLoop from './components/LogoLoop';
-import BoardTemplatesModal from './components/BoardTemplatesModal';
 import Login from './components/Login';
 import Register from './components/Register';
 import {
@@ -15,6 +14,8 @@ import {
   AtlassianLogo
 } from './components/CompanyLogos';
 import { getAuthToken, setAuthToken } from './services/api';
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
+import BoardsPage from './pages/BoardsPage';
 
 const boardColumns = [
   {
@@ -121,8 +122,9 @@ function App() {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authView, setAuthView] = useState(null);
-  const [columns, setColumns] = useState(boardColumns);
-  const [showTemplates, setShowTemplates] = useState(false);
+  const [columns] = useState(boardColumns);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const nextTheme = theme === 'dark' ? 'dark' : 'light';
@@ -215,6 +217,7 @@ function App() {
             <span className="brand-name">Epitrello</span>
           </div>
           <nav className="nav-links">
+            <Link to="/boards" className="ghost-button" style={{ textDecoration: 'none' }}>Boards</Link>
             <a href="#product">Product</a>
             <a href="#solutions">Solutions</a>
             <a href="#pricing">Pricing</a>
@@ -252,7 +255,7 @@ function App() {
           <span className="brand-name">Epitrello</span>
         </div>
         <nav className="nav-links">
-          <button type="button" className="ghost-button" onClick={() => setShowTemplates(true)}>Boards</button>
+          <Link to="/boards" className="ghost-button" style={{ textDecoration: 'none' }}>Boards</Link>
           <a href="#product">Product</a>
           <a href="#solutions">Solutions</a>
           <a href="#pricing">Pricing</a>
@@ -290,6 +293,9 @@ function App() {
         </div>
       </header>
 
+      {location.pathname.startsWith('/boards') ? (
+        <BoardsPage />
+      ) : (
       <main className="page">
         <section className="hero" id="product">
           <div className="hero-copy">
@@ -299,8 +305,8 @@ function App() {
               Build boards that keep every teammate aligned. Capture ideas, automate the busy work,
               and ship faster with a visual workspace inspired by Kanban.
             </p>
-          <div className="hero-actions">
-              <button type="button" className="primary-button" onClick={() => setShowTemplates(true)}>Start your board</button>
+            <div className="hero-actions">
+              <button type="button" className="primary-button" onClick={() => navigate('/boards')}>Start your board</button>
               <button type="button" className="ghost-button">Watch demo</button>
             </div>
             <div className="hero-meta">
@@ -387,6 +393,7 @@ function App() {
           </div>
         </section>
       </main>
+      )}
 
       <footer className="footer" id="resources">
         <p>© {new Date().getFullYear()} Epitrello. Inspired by the Kanban method.</p>
@@ -396,17 +403,16 @@ function App() {
           <a href="/support">Support</a>
         </div>
       </footer>
-
-      <BoardTemplatesModal
-        open={showTemplates}
-        onClose={() => setShowTemplates(false)}
-        onSelect={(tpl) => {
-          setColumns(tpl.columns);
-          setShowTemplates(false);
-        }}
-      />
     </div>
   );
 }
 
-export default App;
+export default function AppWithRouter() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/*" element={<App />} />
+      </Routes>
+    </Router>
+  );
+}
