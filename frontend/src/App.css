@@ -109,6 +109,18 @@
   gap: 4rem;
 }
 
+.auth-section {
+  padding: 0 3rem 4rem;
+  display: flex;
+  justify-content: center;
+}
+
+.auth-section .auth-container {
+  min-height: auto;
+  padding: 0;
+  background: none;
+}
+
 .hero {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));

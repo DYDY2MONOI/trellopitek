@@ -64,6 +64,14 @@ const featureHighlights = [
   }
 ];
 
+const THEME_STORAGE_KEY = 'trellomirror-theme';
+
+const getStoredTheme = () => {
+  if (typeof window === 'undefined') return 'light';
+  const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+  return stored === 'dark' ? 'dark' : 'light';
+};
+
 const companyLogos = [
   { 
     node: <VisaLogo />,
@@ -108,13 +116,19 @@ const companyLogos = [
 ];
 
 function App() {
-  const [theme, setTheme] = useState('light');
+  const [theme, setTheme] = useState(() => getStoredTheme());
   const [user, setUser] = useState(null);
   const [showLogin, setShowLogin] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : 'light');
+    const nextTheme = theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', nextTheme);
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+    } catch (error) {
+      // Ignore storage errors (e.g., private mode)
+    }
   }, [theme]);
 
   useEffect(() => {
@@ -153,35 +167,25 @@ function App() {
     setAuthToken(null);
     setUser(null);
     setIsAuthenticated(false);
+    setShowLogin(true);
   };
 
-  // Show login/register if not authenticated
-  if (!isAuthenticated) {
-    return (
-      <div className="app-shell">
-        <header className="topbar">
-          <div className="brand">
-            <span className="brand-mark" aria-hidden>EP</span>
-            <span className="brand-name">Epitrello</span>
-          </div>
-          <div className="topbar-actions">
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={() => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))}
-            >
-              {theme === 'light' ? 'Dark mode' : 'Light mode'}
-            </button>
-          </div>
-        </header>
-        {showLogin ? (
-          <Login onLogin={handleLogin} onSwitchToRegister={() => setShowLogin(false)} />
-        ) : (
-          <Register onRegister={handleRegister} onSwitchToLogin={() => setShowLogin(true)} />
-        )}
-      </div>
-    );
-  }
+  const scrollToAuthSection = () => {
+    const authSection = document.getElementById('auth-section');
+    if (authSection) {
+      authSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const handleShowLogin = () => {
+    setShowLogin(true);
+    scrollToAuthSection();
+  };
+
+  const handleShowRegister = () => {
+    setShowLogin(false);
+    scrollToAuthSection();
+  };
 
   return (
     <div className="app-shell">
@@ -204,14 +208,27 @@ function App() {
           >
             {theme === 'light' ? 'Dark mode' : 'Light mode'}
           </button>
-          {user && (
-            <span className="user-email" style={{ marginRight: '1rem', opacity: 0.8 }}>
-              {user.email}
-            </span>
+          {isAuthenticated ? (
+            <>
+              {user && (
+                <span className="user-email" style={{ marginRight: '1rem', opacity: 0.8 }}>
+                  {user.email}
+                </span>
+              )}
+              <button type="button" className="ghost-button" onClick={handleLogout}>
+                Log out
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="ghost-button" onClick={handleShowLogin}>
+                Log in
+              </button>
+              <button type="button" className="primary-button" onClick={handleShowRegister}>
+                Sign up
+              </button>
+            </>
           )}
-          <button type="button" className="ghost-button" onClick={handleLogout}>
-            Log out
-          </button>
         </div>
       </header>
 
@@ -311,6 +328,15 @@ function App() {
             <button type="button" className="ghost-button">Compare plans</button>
           </div>
         </section>
+        {!isAuthenticated && (
+          <section className="auth-section" id="auth-section">
+            {showLogin ? (
+              <Login onLogin={handleLogin} onSwitchToRegister={handleShowRegister} />
+            ) : (
+              <Register onRegister={handleRegister} onSwitchToLogin={handleShowLogin} />
+            )}
+          </section>
+        )}
       </main>
 
       <footer className="footer" id="resources">
