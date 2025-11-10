@@ -20,7 +20,8 @@ func main() {
 	defer db.Close()
 
 	// Initialize handlers
-	authHandler := handlers.NewAuthHandler(db)
+    authHandler := handlers.NewAuthHandler(db)
+    boardHandler := handlers.NewBoardHandler(db)
 
 	// Setup router
 	r := mux.NewRouter()
@@ -35,7 +36,10 @@ func main() {
 	// Protected routes
 	protected := r.PathPrefix("/api").Subrouter()
 	protected.Use(middleware.AuthMiddleware)
-	protected.HandleFunc("/me", authHandler.GetMe).Methods("GET")
+    protected.HandleFunc("/me", authHandler.GetMe).Methods("GET")
+    protected.HandleFunc("/boards", boardHandler.ListBoards).Methods("GET")
+    protected.HandleFunc("/boards", boardHandler.CreateBoard).Methods("POST")
+    protected.HandleFunc("/boards/{id}", boardHandler.GetBoard).Methods("GET")
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -45,4 +49,3 @@ func main() {
 	log.Printf("Server starting on port %s", port)
 	log.Fatal(http.ListenAndServe(":"+port, r))
 }
-

@@ -4,42 +4,34 @@ import './BoardsPage.css';
 import { DndContext, closestCorners, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { getAuthToken, api } from '../services/api';
 
-const STORAGE_KEY = 'trellomirror-board-columns';
+const STORAGE_KEY = 'trellomirror-board-columns-v2';
 
 const defaultKanban = [
   {
     id: 'col-ideas',
     title: 'Ideas',
     accent: 'accent',
-    cards: [
-      { id: 'd1', title: 'Explore new feature ideas', badge: 'Product', color: 'accent' },
-      { id: 'd2', title: 'Collect feedback from users', badge: 'Research', color: 'primary' }
-    ]
+    cards: []
   },
   {
     id: 'col-progress',
     title: 'In Progress',
     accent: 'primary',
-    cards: [
-      { id: 'd3', title: 'Implement auth flow', badge: 'Dev', color: 'primary' }
-    ]
+    cards: []
   },
   {
     id: 'col-review',
     title: 'Review',
     accent: 'warning',
-    cards: [
-      { id: 'd4', title: 'QA for sprint items', badge: 'QA', color: 'warning' }
-    ]
+    cards: []
   },
   {
     id: 'col-done',
     title: 'Done',
     accent: 'success',
-    cards: [
-      { id: 'd5', title: 'Release v1.0.0', badge: 'Release', color: 'success' }
-    ]
+    cards: []
   }
 ];
 
@@ -86,7 +78,6 @@ export default function BoardsPage() {
     const { active, over } = event;
     if (!over) return;
 
-    // Column drag
     const activeColIndex = columns.findIndex(c => c.id === active.id);
     const overColIndex = columns.findIndex(c => c.id === over.id);
     if (activeColIndex !== -1 && overColIndex !== -1) {
@@ -96,7 +87,6 @@ export default function BoardsPage() {
       return;
     }
 
-    // Card drag
     const fromColIndex = columns.findIndex(c => c.cards.some(card => String(card.id) === String(active.id)));
     if (fromColIndex === -1) return;
     const toColIndexCandidate = columns.findIndex(c => c.cards.some(card => String(card.id) === String(over.id)) || c.id === over.id);
@@ -169,6 +159,36 @@ export default function BoardsPage() {
       </div>
     );
   }
+
+  useEffect(() => {
+    const token = getAuthToken();
+    if (!token) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const boards = await api.getBoards(token);
+        let boardId;
+        if (boards && boards.length > 0) {
+          boardId = boards[0].id;
+        } else {
+          const created = await api.createBoard('Mon tableau Trello', token);
+          boardId = created.id;
+        }
+        const detail = await api.getBoard(boardId, token);
+        if (cancelled) return;
+        setTitle(detail.title || 'Mon tableau Trello');
+        const mapped = (detail.lists || []).map((l) => ({
+          id: `col-${l.id}`,
+          title: l.title,
+          accent: l.accent || 'primary',
+          cards: (l.cards || []).map((c) => ({ id: String(c.id), title: c.title, badge: c.badge, color: c.color || 'primary' }))
+        }));
+        setColumns(mapped);
+      } catch (e) {
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <div className="boards-layout">
