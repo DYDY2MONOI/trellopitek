@@ -3,6 +3,7 @@ import './App.css';
 import LogoLoop from './components/LogoLoop';
 import Login from './components/Login';
 import Register from './components/Register';
+import Icon from './components/Icon';
 import {
   VisaLogo,
   CoinbaseLogo,
@@ -336,7 +337,8 @@ function App() {
                         <p>{card.title}</p>
                         <footer className="card-footer">
                           <span className="card-checklist">
-                            <span aria-hidden>☑</span> 3/5
+                            <Icon name="checklist" size={14} />
+                            <span>3/5</span>
                           </span>
                           <span className="card-avatars">
                             <span className="mini-avatar" aria-hidden>JD</span>

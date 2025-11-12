@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import BoardTemplatesModal from '../components/BoardTemplatesModal';
+import Icon from '../components/Icon';
 import './BoardsPage.css';
-import { DndContext, closestCorners, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy, horizontalListSortingStrategy } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { getAuthToken, api } from '../services/api';
 
 const STORAGE_KEY = 'trellomirror-board-columns-v2';
@@ -34,6 +33,48 @@ const defaultKanban = [
     cards: []
   }
 ];
+
+function reorder(list, startIndex, endIndex) {
+  if (startIndex === endIndex) return list;
+  const result = Array.from(list);
+  const [removed] = result.splice(startIndex, 1);
+  if (!removed) return list;
+  result.splice(endIndex, 0, removed);
+  return result;
+}
+
+function moveCardBetweenColumns(columns, sourceColIndex, destColIndex, sourceIndex, destIndex) {
+  if (sourceColIndex === destColIndex) {
+    const column = columns[sourceColIndex];
+    if (!column) return columns;
+    const reordered = reorder(column.cards, sourceIndex, destIndex);
+    if (reordered === column.cards) return columns;
+    const updated = [...columns];
+    updated[sourceColIndex] = { ...column, cards: reordered };
+    return updated;
+  }
+
+  const sourceCol = columns[sourceColIndex];
+  const destCol = columns[destColIndex];
+  if (!sourceCol || !destCol) return columns;
+
+  const sourceCards = Array.from(sourceCol.cards);
+  const [moved] = sourceCards.splice(sourceIndex, 1);
+  if (!moved) return columns;
+
+  const destCards = Array.from(destCol.cards);
+  const movedIntoDest = {
+    ...moved,
+    badge: destCol.title,
+    color: destCol.accent || moved.color,
+  };
+  destCards.splice(destIndex, 0, movedIntoDest);
+
+  const updated = [...columns];
+  updated[sourceColIndex] = { ...sourceCol, cards: sourceCards };
+  updated[destColIndex] = { ...destCol, cards: destCards };
+  return updated;
+}
 
 export default function BoardsPage() {
   const [columns, setColumns] = useState(() => {
@@ -116,9 +157,7 @@ export default function BoardsPage() {
 
   useMemo(() => columns.length, [columns]);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
-  );
+  const overridesByColumn = loadOverrides();
 
   function parseListId(colId) {
     const m = String(colId).match(/^col-(\d+)/);
@@ -139,94 +178,29 @@ export default function BoardsPage() {
     }));
   }
 
-  function handleDragEnd(event) {
-    const { active, over } = event;
-    if (!over) return;
+  function handleDragEnd(result) {
+    const { destination, source, type } = result;
+    if (!destination) return;
 
-    const activeColIndex = columns.findIndex(c => c.id === active.id);
-    const overColIndex = columns.findIndex(c => c.id === over.id);
-    if (activeColIndex !== -1 && overColIndex !== -1) {
-      if (activeColIndex !== overColIndex) {
-        setColumns((cols) => arrayMove(cols, activeColIndex, overColIndex));
-      }
+    if (type === 'COLUMN') {
+      if (destination.index === source.index) return;
+      setColumns((cols) => reorder(cols, source.index, destination.index));
       return;
     }
 
-    const fromColIndex = columns.findIndex(c => c.cards.some(card => String(card.id) === String(active.id)));
-    if (fromColIndex === -1) return;
-    const toColIndexCandidate = columns.findIndex(c => c.cards.some(card => String(card.id) === String(over.id)) || c.id === over.id);
-    const toColIndex = toColIndexCandidate === -1 ? fromColIndex : toColIndexCandidate;
-
-    const fromCol = columns[fromColIndex];
-    const toCol = columns[toColIndex];
-    const fromIndex = fromCol.cards.findIndex(card => String(card.id) === String(active.id));
-    let toIndex = toCol.cards.findIndex(card => String(card.id) === String(over.id));
-    if (toIndex === -1) toIndex = toCol.cards.length;
-
-    if (fromColIndex === toColIndex) {
-      if (fromIndex !== toIndex) {
-        const newCards = arrayMove(fromCol.cards, fromIndex, toIndex);
-        const updated = [...columns];
-        updated[fromColIndex] = { ...fromCol, cards: newCards };
-        setColumns(updated);
-      }
-    } else {
-      const moving = fromCol.cards[fromIndex];
-      const newFrom = Array.from(fromCol.cards);
-      newFrom.splice(fromIndex, 1);
-      const newTo = Array.from(toCol.cards);
-      newTo.splice(toIndex, 0, moving);
-      const updated = [...columns];
-      updated[fromColIndex] = { ...fromCol, cards: newFrom };
-      updated[toColIndex] = { ...toCol, cards: newTo };
-      setColumns(updated);
+    if (
+      destination.droppableId === source.droppableId &&
+      destination.index === source.index
+    ) {
+      return;
     }
-  }
 
-  function ColumnSortable({ column, children, onOpenMenu }) {
-    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: column.id });
-    const style = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-    };
-    const overrides = loadOverrides();
-    const colHex = overrides[column.id] ? normHex(overrides[column.id]) : null;
-    const headerStyle = colHex ? { backgroundColor: colHex, color: textOn(colHex) } : undefined;
-    const listClass = colHex ? 'list' : `list list--${column.accent}`;
-    return (
-      <article className={listClass} ref={setNodeRef} style={style} role="listitem">
-        <header className="list-header" {...attributes} {...listeners} style={{ cursor: 'grab', ...headerStyle }}>
-          <div className="list-title">
-            <span className="list-title-text">{column.title}</span>
-            <span className="list-count">{column.cards.length}</span>
-          </div>
-          <div className="list-actions">
-            <button className="list-action" type="button" aria-label="More" onClick={() => onOpenMenu(column)}>⋯</button>
-          </div>
-        </header>
-        {children}
-        {openMenuFor === column.id && (
-          <ListColorMenu
-            column={column}
-            presetMap={COLOR_MAP}
-            onClose={() => setOpenMenuFor(null)}
-            onSelectColor={(hexOrToken) => {
-              const o = loadOverrides();
-              if (isHex(hexOrToken)) {
-                o[column.id] = normHex(hexOrToken);
-              } else if (hexOrToken in COLOR_MAP) {
-                // store hex to be generic and decouple from tokens
-                o[column.id] = COLOR_MAP[hexOrToken];
-              }
-              saveOverrides(o);
-              // trigger rerender
-              setColumns([...columns]);
-              setOpenMenuFor(null);
-            }}
-          />
-        )}
-      </article>
-    );
+    setColumns((cols) => {
+      const sourceColIndex = cols.findIndex((col) => col.id === source.droppableId);
+      const destColIndex = cols.findIndex((col) => col.id === destination.droppableId);
+      if (sourceColIndex === -1 || destColIndex === -1) return cols;
+      return moveCardBetweenColumns(cols, sourceColIndex, destColIndex, source.index, destination.index);
+    });
   }
 
   async function handleAddCardSubmit(column, draftTitle) {
@@ -256,33 +230,6 @@ export default function BoardsPage() {
       setColumns((cols) => cols.map((c) => c.id === column.id ? { ...c, cards: [...c.cards, newCardLocal] } : c));
       setComposerFor(null);
     }
-  }
-
-  function CardSortable({ card, column }) {
-    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: String(card.id) });
-    const style = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-    };
-    const overrides = loadOverrides();
-    const hexFromOverride = overrides[column.id] ? normHex(overrides[column.id]) : null;
-    // Choose color: card token -> preset; else column override; fallback preset by column accent token
-    const tokenHex = COLOR_MAP[card.color] || null;
-    const columnTokenHex = COLOR_MAP[column.accent] || null;
-    const finalHex = hexFromOverride || tokenHex || columnTokenHex || COLOR_MAP.primary;
-    const badgeStyle = { backgroundColor: rgba(finalHex, 0.18), color: finalHex };
-    return (
-      <div className="tcard" ref={setNodeRef} style={style} {...attributes} {...listeners}>
-        <div className="tcard-badges">
-          <span className={`tbadge tbadge--${card.color}`} style={badgeStyle}>{card.badge}</span>
-        </div>
-        <div className="tcard-title">{card.title}</div>
-        <div className="tcard-meta">
-          <span className="tmeta">👁️ 1</span>
-          <span className="tmeta">📄 0/6</span>
-        </div>
-      </div>
-    );
   }
 
   function CardComposer({ onAdd, onCancel }) {
@@ -404,7 +351,9 @@ export default function BoardsPage() {
     <div className="boards-layout">
       <aside className="boards-sidebar" aria-label="Sidebar">
         <div className="sidebar-header">
-          <button type="button" className="sidebar-logo" aria-label="Workspace">▦</button>
+          <button type="button" className="sidebar-logo" aria-label="Workspace">
+            <Icon name="workspace" size={18} />
+          </button>
           <div className="sidebar-title">Inbox</div>
         </div>
         <div className="sidebar-add">
@@ -416,9 +365,15 @@ export default function BoardsPage() {
             Have an idea? Email it, forward it — however it pops up
           </p>
           <div className="sidebar-icons">
-            <button className="sidebar-icon" type="button" aria-label="Mail">✉️</button>
-            <button className="sidebar-icon" type="button" aria-label="Chrome">🌐</button>
-            <button className="sidebar-icon" type="button" aria-label="More">➕</button>
+            <button className="sidebar-icon" type="button" aria-label="Mail">
+              <Icon name="mail" size={18} />
+            </button>
+            <button className="sidebar-icon" type="button" aria-label="Web clipper">
+              <Icon name="globe" size={18} />
+            </button>
+            <button className="sidebar-icon" type="button" aria-label="Add integration">
+              <Icon name="plus" size={18} />
+            </button>
           </div>
           <div className="sidebar-privacy">A 100% private inbox</div>
         </div>
@@ -429,39 +384,126 @@ export default function BoardsPage() {
           <div className="board-title-row">
             <h1 className="board-title" dir="ltr" contentEditable suppressContentEditableWarning onBlur={(e)=>setTitle(e.currentTarget.textContent || 'My Trello board')}>{title}</h1>
             <div className="board-actions">
-              <button type="button" className="board-action">⋯</button>
-              <button type="button" className="board-action">⭐</button>
+              <button type="button" className="board-action" aria-label="Board options">⋯</button>
+              <button type="button" className="board-action" aria-label="Star board">
+                <Icon name="star" size={16} />
+              </button>
               <button type="button" className="board-share">Share</button>
             </div>
           </div>
         </header>
 
-        <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-          <SortableContext items={columns.map(c => c.id)} strategy={horizontalListSortingStrategy}>
-            <div className="lists-wrapper" role="list" aria-label="Board lists">
-              {columns.map((col) => (
-                <ColumnSortable key={col.id} column={col} onOpenMenu={(c)=> setOpenMenuFor(c.id)}>
-                  <SortableContext items={col.cards.map(card => String(card.id))} strategy={verticalListSortingStrategy}>
-                    <div className="list-cards">
-                      {col.cards.map(card => (
-                        <CardSortable key={card.id} card={card} column={col} />
-                      ))}
-                      {composerFor === col.id ? (
-                        <CardComposer
-                          onAdd={(value) => handleAddCardSubmit(col, value)}
-                          onCancel={() => setComposerFor(null)}
-                        />
-                      ) : (
-                        <button type="button" className="tadd-card" onClick={() => setComposerFor(col.id)}>+ Add a card</button>
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <Droppable droppableId="board" direction="horizontal" type="COLUMN">
+            {(boardProvided) => (
+              <div
+                className="lists-wrapper"
+                role="list"
+                aria-label="Board lists"
+                ref={boardProvided.innerRef}
+                {...boardProvided.droppableProps}
+              >
+                {columns.map((col, colIndex) => {
+                  const colOverrideHex = overridesByColumn[col.id] ? normHex(overridesByColumn[col.id]) : null;
+                  const headerStyle = colOverrideHex ? { backgroundColor: colOverrideHex, color: textOn(colOverrideHex) } : undefined;
+                  const listClass = colOverrideHex ? 'list' : `list list--${col.accent}`;
+                  return (
+                    <Draggable draggableId={col.id} index={colIndex} key={col.id}>
+                      {(colProvided) => (
+                        <article
+                          className={listClass}
+                          ref={colProvided.innerRef}
+                          role="listitem"
+                          {...colProvided.draggableProps}
+                          style={colProvided.draggableProps.style}
+                        >
+                          <header className="list-header" style={{ cursor: 'grab', ...headerStyle }} {...colProvided.dragHandleProps}>
+                            <div className="list-title">
+                              <span className="list-title-text">{col.title}</span>
+                              <span className="list-count">{col.cards.length}</span>
+                            </div>
+                            <div className="list-actions">
+                              <button className="list-action" type="button" aria-label="More" onClick={() => setOpenMenuFor(col.id)}>⋯</button>
+                            </div>
+                          </header>
+                          <Droppable droppableId={col.id} type="CARD">
+                            {(listProvided) => (
+                              <div className="list-cards" ref={listProvided.innerRef} {...listProvided.droppableProps}>
+                                {col.cards.map((card, cardIndex) => {
+                                  const tokenHex = COLOR_MAP[card.color] || null;
+                                  const columnTokenHex = COLOR_MAP[col.accent] || null;
+                                  const finalHex = colOverrideHex || tokenHex || columnTokenHex || COLOR_MAP.primary;
+                                  const badgeStyle = { backgroundColor: rgba(finalHex, 0.18), color: finalHex };
+                                  return (
+                                    <Draggable key={card.id} draggableId={String(card.id)} index={cardIndex}>
+                                      {(cardProvided) => (
+                                        <div
+                                          className="tcard"
+                                          ref={cardProvided.innerRef}
+                                          {...cardProvided.draggableProps}
+                                          {...cardProvided.dragHandleProps}
+                                          style={cardProvided.draggableProps.style}
+                                        >
+                                          <div className="tcard-badges">
+                                            <span className={`tbadge tbadge--${card.color}`} style={badgeStyle}>{card.badge}</span>
+                                          </div>
+                                          <div className="tcard-title">{card.title}</div>
+                                          <div className="tcard-meta">
+                                            <span className="tmeta">
+                                              <Icon name="eye" size={14} />
+                                              <span>1</span>
+                                            </span>
+                                            <span className="tmeta">
+                                              <Icon name="document" size={14} />
+                                              <span>0/6</span>
+                                            </span>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </Draggable>
+                                  );
+                                })}
+                                {listProvided.placeholder}
+                                {composerFor === col.id ? (
+                                  <CardComposer
+                                    onAdd={(value) => handleAddCardSubmit(col, value)}
+                                    onCancel={() => setComposerFor(null)}
+                                  />
+                                ) : (
+                                  <button type="button" className="tadd-card" onClick={() => setComposerFor(col.id)}>+ Add a card</button>
+                                )}
+                              </div>
+                            )}
+                          </Droppable>
+                          {openMenuFor === col.id && (
+                            <ListColorMenu
+                              column={col}
+                              presetMap={COLOR_MAP}
+                              onClose={() => setOpenMenuFor(null)}
+                              onSelectColor={(hexOrToken) => {
+                                const o = loadOverrides();
+                                if (isHex(hexOrToken)) {
+                                  o[col.id] = normHex(hexOrToken);
+                                } else if (hexOrToken in COLOR_MAP) {
+                                  o[col.id] = COLOR_MAP[hexOrToken];
+                                }
+                                saveOverrides(o);
+                                setColumns([...columns]);
+                                setOpenMenuFor(null);
+                              }}
+                            />
+                          )}
+                        </article>
                       )}
-                    </div>
-                  </SortableContext>
-                </ColumnSortable>
-              ))}
-              <button type="button" className="list list--adder">+ Add a list</button>
-            </div>
-          </SortableContext>
-        </DndContext>
+                    </Draggable>
+                  );
+                })}
+                {boardProvided.placeholder}
+                <button type="button" className="list list--adder">+ Add a list</button>
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
 
         <div className="boards-toolbar" role="toolbar" aria-label="Board toolbar">
           <button type="button" className="toolbar-btn toolbar-btn--active">Inbox</button>
