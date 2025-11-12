@@ -34,12 +34,13 @@ func main() {
 	r.HandleFunc("/api/login", authHandler.Login).Methods("POST", "OPTIONS")
 
 	// Protected routes
-	protected := r.PathPrefix("/api").Subrouter()
-	protected.Use(middleware.AuthMiddleware)
+    protected := r.PathPrefix("/api").Subrouter()
+    protected.Use(middleware.AuthMiddleware)
     protected.HandleFunc("/me", authHandler.GetMe).Methods("GET")
     protected.HandleFunc("/boards", boardHandler.ListBoards).Methods("GET")
     protected.HandleFunc("/boards", boardHandler.CreateBoard).Methods("POST")
     protected.HandleFunc("/boards/{id}", boardHandler.GetBoard).Methods("GET")
+    protected.HandleFunc("/lists/{id}/cards", boardHandler.CreateCard).Methods("POST")
 
 	port := os.Getenv("PORT")
 	if port == "" {

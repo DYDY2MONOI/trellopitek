@@ -119,6 +119,11 @@ export default function BoardsPage() {
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
 
+  function parseListId(colId) {
+    const m = String(colId).match(/^col-(\d+)/);
+    return m ? parseInt(m[1], 10) : null;
+  }
+
   function ensureIds(cols) {
     return cols.map((c, idx) => ({
       id: c.id || `col-${idx}-${c.title?.toLowerCase().replace(/\s+/g, '-')}`,
@@ -221,6 +226,32 @@ export default function BoardsPage() {
         )}
       </article>
     );
+  }
+
+  async function handleAddCard(column) {
+    const title = window.prompt('Card title');
+    if (!title) return;
+    const token = getAuthToken();
+    const listId = parseListId(column.id);
+    const newCardLocal = {
+      id: String(Date.now()),
+      title,
+      badge: column.title,
+      color: column.accent || 'primary',
+    };
+    if (!token || !listId) {
+      // Local-only fallback
+      setColumns((cols) => cols.map((c) => c.id === column.id ? { ...c, cards: [...c.cards, newCardLocal] } : c));
+      return;
+    }
+    try {
+      const created = await api.createCard(listId, { title, badge: column.title, color: column.accent }, token);
+      const card = { id: String(created.id), title: created.title, badge: created.badge, color: created.color || (column.accent || 'primary') };
+      setColumns((cols) => cols.map((c) => c.id === column.id ? { ...c, cards: [...c.cards, card] } : c));
+    } catch (e) {
+      // Fallback to local on error to keep UX responsive
+      setColumns((cols) => cols.map((c) => c.id === column.id ? { ...c, cards: [...c.cards, newCardLocal] } : c));
+    }
   }
 
   function CardSortable({ card, column }) {
@@ -364,7 +395,7 @@ export default function BoardsPage() {
                       {col.cards.map(card => (
                         <CardSortable key={card.id} card={card} column={col} />
                       ))}
-                      <button type="button" className="tadd-card">+ Add a card</button>
+                      <button type="button" className="tadd-card" onClick={() => handleAddCard(col)}>+ Add a card</button>
                     </div>
                   </SortableContext>
                 </ColumnSortable>

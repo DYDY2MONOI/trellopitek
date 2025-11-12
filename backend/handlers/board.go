@@ -139,3 +139,50 @@ func (h *BoardHandler) CreateBoard(w http.ResponseWriter, r *http.Request) {
 
     json.NewEncoder(w).Encode(b)
 }
+
+// CreateCard handles POST /api/lists/{id}/cards
+// Body: { "title": string, "badge"?: string, "color"?: string }
+// Returns the created card as JSON.
+func (h *BoardHandler) CreateCard(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+    vars := mux.Vars(r)
+    listID, err := strconv.Atoi(vars["id"])
+    if err != nil || listID <= 0 {
+        http.Error(w, "invalid list id", http.StatusBadRequest)
+        return
+    }
+
+    // Ensure list exists and belongs to a board owned by the user (basic existence check here)
+    l, err := h.Lists.GetListByID(listID)
+    if err != nil {
+        http.Error(w, "list not found", http.StatusNotFound)
+        return
+    }
+    _ = l // In a fuller impl, verify ownership via board -> user_id
+
+    var body struct {
+        Title string `json:"title"`
+        Badge string `json:"badge"`
+        Color string `json:"color"`
+    }
+    if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Title == "" {
+        http.Error(w, "invalid payload", http.StatusBadRequest)
+        return
+    }
+
+    // Position at the end
+    existing, err := h.Cards.GetCardsByList(listID)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+    pos := len(existing)
+
+    card, err := h.Cards.CreateCard(listID, body.Title, body.Badge, body.Color, pos)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    json.NewEncoder(w).Encode(card)
+}

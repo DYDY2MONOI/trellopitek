@@ -88,6 +88,22 @@ export const api = {
     if (!response.ok) throw new Error('Failed to fetch board');
     return response.json();
   },
+
+  async createCard(listId, { title, badge, color }, token) {
+    const response = await fetch(`${API_URL}/lists/${listId}/cards`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ title, badge, color }),
+    });
+    if (!response.ok) {
+      const err = await response.text().catch(() => 'Failed to create card');
+      throw new Error(err || 'Failed to create card');
+    }
+    return response.json();
+  },
 };
 
 export const setAuthToken = (token) => {
