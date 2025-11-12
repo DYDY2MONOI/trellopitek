@@ -73,7 +73,14 @@
 .tbadge--inbox { background: rgba(71, 85, 105, 0.18); color: #475569; }
 .tcard-title { font-weight: 700; margin-bottom: .3rem; }
 .tcard-meta { display: flex; gap: .6rem; opacity: .7; font-size: .8rem; }
-.tadd-card { border: none; background: transparent; text-align: left; color: var(--color-text); padding: .3rem .2rem; opacity: .85; }
+.tadd-card { border: none; background: transparent; text-align: left; color: var(--color-text); padding: .3rem .2rem; opacity: .85; cursor: pointer; }
+
+/* Inline card composer */
+.tadd-composer { background: var(--color-card); border: 1px solid var(--color-border); border-radius: .6rem; padding: .5rem; box-shadow: var(--shadow-soft); display: flex; flex-direction: column; gap: .5rem; }
+.tadd-input { width: 100%; border: 1px solid var(--color-border); border-radius: .5rem; padding: .5rem .6rem; background: var(--color-bg); color: var(--color-text); resize: vertical; direction: ltr; text-align: left; }
+.tadd-actions { display: flex; align-items: center; gap: .5rem; }
+.tadd-confirm { border: none; background: linear-gradient(135deg, var(--color-primary), var(--color-accent)); color: #fff; border-radius: .5rem; padding: .35rem .7rem; font-weight: 700; cursor: pointer; }
+.tadd-cancel { border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); border-radius: .5rem; padding: .35rem .7rem; cursor: pointer; }
 
 .boards-toolbar { position: sticky; bottom: .75rem; left: 0; right: 0; margin: .75rem auto 0; width: fit-content; display: flex; gap: .5rem; padding: .4rem; background: var(--color-card); border: 1px solid var(--color-border); border-radius: .75rem; backdrop-filter: blur(8px); }
 .toolbar-btn { color: var(--color-text); background: transparent; border: 1px solid transparent; border-radius: .5rem; padding: .35rem .6rem; }

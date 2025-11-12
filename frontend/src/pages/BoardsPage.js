@@ -48,6 +48,7 @@ export default function BoardsPage() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [title, setTitle] = useState('My Trello board');
   const [openMenuFor, setOpenMenuFor] = useState(null);
+  const [composerFor, setComposerFor] = useState(null);
 
   const COLOR_MAP = {
     accent: '#8B5CF6',
@@ -228,8 +229,8 @@ export default function BoardsPage() {
     );
   }
 
-  async function handleAddCard(column) {
-    const title = window.prompt('Card title');
+  async function handleAddCardSubmit(column, draftTitle) {
+    const title = (draftTitle || '').trim();
     if (!title) return;
     const token = getAuthToken();
     const listId = parseListId(column.id);
@@ -242,15 +243,18 @@ export default function BoardsPage() {
     if (!token || !listId) {
       // Local-only fallback
       setColumns((cols) => cols.map((c) => c.id === column.id ? { ...c, cards: [...c.cards, newCardLocal] } : c));
+      setComposerFor(null);
       return;
     }
     try {
       const created = await api.createCard(listId, { title, badge: column.title, color: column.accent }, token);
       const card = { id: String(created.id), title: created.title, badge: created.badge, color: created.color || (column.accent || 'primary') };
       setColumns((cols) => cols.map((c) => c.id === column.id ? { ...c, cards: [...c.cards, card] } : c));
+      setComposerFor(null);
     } catch (e) {
       // Fallback to local on error to keep UX responsive
       setColumns((cols) => cols.map((c) => c.id === column.id ? { ...c, cards: [...c.cards, newCardLocal] } : c));
+      setComposerFor(null);
     }
   }
 
@@ -276,6 +280,53 @@ export default function BoardsPage() {
         <div className="tcard-meta">
           <span className="tmeta">👁️ 1</span>
           <span className="tmeta">📄 0/6</span>
+        </div>
+      </div>
+    );
+  }
+
+  function CardComposer({ onAdd, onCancel }) {
+    const inputRef = useRef(null);
+    const [value, setValue] = useState('');
+    useEffect(() => { inputRef.current?.focus(); }, []);
+    const handleSubmit = async () => {
+      const next = value.trim();
+      if (!next) return;
+      try {
+        await onAdd?.(next);
+      } catch {
+        // keep value so user can retry
+      }
+    };
+    const handleCancel = () => {
+      setValue('');
+      onCancel?.();
+    };
+    const onKeyDown = (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSubmit();
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleCancel();
+      }
+    };
+    return (
+      <div className="tadd-composer">
+        <textarea
+          ref={inputRef}
+          className="tadd-input"
+          dir="ltr"
+          placeholder="Enter a title for this card..."
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={onKeyDown}
+          rows={3}
+        />
+        <div className="tadd-actions">
+          <button type="button" className="tadd-confirm" onClick={handleSubmit}>Add card</button>
+          <button type="button" className="tadd-cancel" onClick={handleCancel}>Cancel</button>
         </div>
       </div>
     );
@@ -376,7 +427,7 @@ export default function BoardsPage() {
       <section className="boards-main">
         <header className="board-header">
           <div className="board-title-row">
-            <h1 className="board-title" contentEditable suppressContentEditableWarning onBlur={(e)=>setTitle(e.currentTarget.textContent || 'My Trello board')}>{title}</h1>
+            <h1 className="board-title" dir="ltr" contentEditable suppressContentEditableWarning onBlur={(e)=>setTitle(e.currentTarget.textContent || 'My Trello board')}>{title}</h1>
             <div className="board-actions">
               <button type="button" className="board-action">⋯</button>
               <button type="button" className="board-action">⭐</button>
@@ -395,7 +446,14 @@ export default function BoardsPage() {
                       {col.cards.map(card => (
                         <CardSortable key={card.id} card={card} column={col} />
                       ))}
-                      <button type="button" className="tadd-card" onClick={() => handleAddCard(col)}>+ Add a card</button>
+                      {composerFor === col.id ? (
+                        <CardComposer
+                          onAdd={(value) => handleAddCardSubmit(col, value)}
+                          onCancel={() => setComposerFor(null)}
+                        />
+                      ) : (
+                        <button type="button" className="tadd-card" onClick={() => setComposerFor(col.id)}>+ Add a card</button>
+                      )}
                     </div>
                   </SortableContext>
                 </ColumnSortable>
