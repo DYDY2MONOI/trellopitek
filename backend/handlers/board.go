@@ -5,6 +5,7 @@ import (
     "encoding/json"
     "net/http"
     "strconv"
+    "strings"
 
     "github.com/gorilla/mux"
     "trellomirror/backend/models"
@@ -62,6 +63,10 @@ func (h *BoardHandler) GetBoard(w http.ResponseWriter, r *http.Request) {
     for _, l := range lists {
         cards, err := h.Cards.GetCardsByList(l.ID)
         if err != nil { http.Error(w, err.Error(), http.StatusInternalServerError); return }
+        // Ensure card colors align with list intent/palette
+        for i := range cards {
+            cards[i].Color = normalizeCardColor(cards[i].Color, l)
+        }
         item := struct {
             models.List `json:",inline"`
             Cards []models.Card `json:"cards"`
@@ -69,6 +74,49 @@ func (h *BoardHandler) GetBoard(w http.ResponseWriter, r *http.Request) {
         resp.Lists = append(resp.Lists, item)
     }
     json.NewEncoder(w).Encode(resp)
+}
+
+// normalizeCardColor derives the CSS token to use for a card's color
+// based primarily on the list title (column) so that colors remain
+// consistent with the requested palette mapping.
+func normalizeCardColor(current string, list models.List) string {
+    title := strings.TrimSpace(strings.ToLower(list.Title))
+    switch title {
+    case "in progress":
+        return "primary"   // #2563EB
+    case "review":
+        return "warning"   // #EAB308
+    case "ideas":
+        return "accent"    // #8B5CF6
+    case "done":
+        return "success"   // #059669
+    case "inbox":
+        return "inbox"     // #475569
+    }
+
+    // Otherwise fallback to list accent if it matches known tokens
+    accent := strings.TrimSpace(strings.ToLower(list.Accent))
+    switch accent {
+    case "primary", "warning", "accent", "success", "inbox":
+        return accent
+    }
+
+    // Finally consider existing card color or map legacy names
+    c := strings.TrimSpace(strings.ToLower(current))
+    switch c {
+    case "primary", "warning", "accent", "success", "inbox":
+        return c
+    case "inprogress", "progress":
+        return "primary"
+    case "idea", "ideas":
+        return "accent"
+    case "done", "complete", "completed":
+        return "success"
+    case "review":
+        return "warning"
+    }
+
+    return "primary"
 }
 
 func (h *BoardHandler) CreateBoard(w http.ResponseWriter, r *http.Request) {
