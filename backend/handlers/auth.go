@@ -52,7 +52,6 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate input
 	if req.Email == "" || req.Password == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(ErrorResponse{Error: "Email and password are required"})
@@ -65,7 +64,6 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Hash password
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -73,7 +71,6 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create user
 	user, err := h.userService.CreateUser(req.Email, string(passwordHash))
 	if err != nil {
 		w.WriteHeader(http.StatusConflict)
@@ -81,7 +78,6 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate JWT token
 	token, err := generateToken(user.ID, user.Email)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -107,14 +103,12 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate input
 	if req.Email == "" || req.Password == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(ErrorResponse{Error: "Email and password are required"})
 		return
 	}
 
-	// Get user
 	user, passwordHash, err := h.userService.GetUserByEmail(req.Email)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -122,7 +116,6 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify password
 	err = bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password))
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -130,7 +123,6 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate JWT token
 	token, err := generateToken(user.ID, user.Email)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

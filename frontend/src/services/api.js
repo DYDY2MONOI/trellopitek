@@ -1,5 +1,3 @@
-// API URL - browser makes requests from client side, so use localhost
-// In Docker, backend is exposed on localhost:8080
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
 
 export const api = {
@@ -56,11 +54,39 @@ export const api = {
       return response.json();
     } catch (e) {
       if (e && typeof e === 'object' && !('status' in e)) {
-        // Network or CORS error; mark with status 0 so callers can decide not to logout
         e.status = 0;
       }
       throw e;
     }
+  },
+
+  async getBoards(token) {
+    const response = await fetch(`${API_URL}/boards`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Failed to fetch boards');
+    return response.json();
+  },
+
+  async createBoard(title, token) {
+    const response = await fetch(`${API_URL}/boards`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ title })
+    });
+    if (!response.ok) throw new Error('Failed to create board');
+    return response.json();
+  },
+
+  async getBoard(boardId, token) {
+    const response = await fetch(`${API_URL}/boards/${boardId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Failed to fetch board');
+    return response.json();
   },
 };
 
