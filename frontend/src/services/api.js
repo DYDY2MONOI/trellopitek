@@ -1,4 +1,4 @@
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
+const API_URL = (process.env.REACT_APP_API_URL || '/api').replace(/\/+$/, '');
 
 export const api = {
   async register(email, password) {
@@ -101,6 +101,22 @@ export const api = {
     if (!response.ok) {
       const err = await response.text().catch(() => 'Failed to create card');
       throw new Error(err || 'Failed to create card');
+    }
+    return response.json();
+  },
+
+  async updateCard(cardId, payload, token) {
+    const response = await fetch(`${API_URL}/cards/${cardId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const err = await response.text().catch(() => 'Failed to update card');
+      throw new Error(err || 'Failed to update card');
     }
     return response.json();
   },

@@ -39,6 +39,7 @@
     ]
   },
   "devDependencies": {
+    "http-proxy-middleware": "^3.0.0",
     "yaml": "^2.8.1"
   }
 }

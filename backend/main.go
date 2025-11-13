@@ -12,35 +12,30 @@ import (
 )
 
 func main() {
-	// Initialize database
 	db, err := models.InitDB()
 	if err != nil {
 		log.Fatal("Failed to initialize database:", err)
 	}
 	defer db.Close()
 
-	// Initialize handlers
-    authHandler := handlers.NewAuthHandler(db)
-    boardHandler := handlers.NewBoardHandler(db)
+	authHandler := handlers.NewAuthHandler(db)
+	boardHandler := handlers.NewBoardHandler(db)
 
-	// Setup router
 	r := mux.NewRouter()
 
-	// CORS middleware
 	r.Use(middleware.CORS)
 
-	// Public routes
 	r.HandleFunc("/api/register", authHandler.Register).Methods("POST", "OPTIONS")
 	r.HandleFunc("/api/login", authHandler.Login).Methods("POST", "OPTIONS")
 
-	// Protected routes
-    protected := r.PathPrefix("/api").Subrouter()
-    protected.Use(middleware.AuthMiddleware)
-    protected.HandleFunc("/me", authHandler.GetMe).Methods("GET")
-    protected.HandleFunc("/boards", boardHandler.ListBoards).Methods("GET")
-    protected.HandleFunc("/boards", boardHandler.CreateBoard).Methods("POST")
-    protected.HandleFunc("/boards/{id}", boardHandler.GetBoard).Methods("GET")
-    protected.HandleFunc("/lists/{id}/cards", boardHandler.CreateCard).Methods("POST")
+	protected := r.PathPrefix("/api").Subrouter()
+	protected.Use(middleware.AuthMiddleware)
+	protected.HandleFunc("/me", authHandler.GetMe).Methods("GET")
+	protected.HandleFunc("/boards", boardHandler.ListBoards).Methods("GET")
+	protected.HandleFunc("/boards", boardHandler.CreateBoard).Methods("POST")
+	protected.HandleFunc("/boards/{id}", boardHandler.GetBoard).Methods("GET")
+	protected.HandleFunc("/lists/{id}/cards", boardHandler.CreateCard).Methods("POST")
+	protected.HandleFunc("/cards/{id}", boardHandler.UpdateCard).Methods("PATCH", "PUT")
 
 	port := os.Getenv("PORT")
 	if port == "" {

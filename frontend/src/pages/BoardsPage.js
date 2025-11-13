@@ -3,36 +3,61 @@ import BoardTemplatesModal from '../components/BoardTemplatesModal';
 import Icon from '../components/Icon';
 import './BoardsPage.css';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { getAuthToken, api } from '../services/api';
-
-const STORAGE_KEY = 'trellomirror-board-columns-v2';
+import { api } from '../services/api';
 
 const defaultKanban = [
   {
     id: 'col-ideas',
+    listId: null,
     title: 'Ideas',
     accent: 'accent',
     cards: []
   },
   {
     id: 'col-progress',
+    listId: null,
     title: 'In Progress',
     accent: 'primary',
     cards: []
   },
   {
     id: 'col-review',
+    listId: null,
     title: 'Review',
     accent: 'warning',
     cards: []
   },
   {
     id: 'col-done',
+    listId: null,
     title: 'Done',
     accent: 'success',
     cards: []
   }
 ];
+
+function parseListId(colId) {
+  const m = String(colId).match(/^col-(\d+)/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function ensureIds(cols) {
+  return cols.map((c, idx) => {
+    const generatedId = c.id || `col-${idx}-${c.title?.toLowerCase().replace(/\s+/g, '-')}`;
+    return {
+      id: generatedId,
+      listId: c.listId ?? parseListId(generatedId) ?? null,
+      title: c.title,
+      accent: c.accent || 'primary',
+      cards: (c.cards || []).map((card, i) => ({
+        id: String(card.id ?? `${c.title}-${i}`),
+        title: card.title,
+        badge: card.badge,
+        color: card.color || 'primary',
+      })),
+    };
+  });
+}
 
 function reorder(list, startIndex, endIndex) {
   if (startIndex === endIndex) return list;
@@ -76,20 +101,17 @@ function moveCardBetweenColumns(columns, sourceColIndex, destColIndex, sourceInd
   return updated;
 }
 
-export default function BoardsPage() {
-  const [columns, setColumns] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      const data = saved ? JSON.parse(saved) : defaultKanban;
-      return ensureIds(data);
-    } catch {
-      return defaultKanban;
-    }
-  });
+export default function BoardsPage({ authToken }) {
+  const [columns, setColumns] = useState(() => ensureIds(defaultKanban));
   const [showTemplates, setShowTemplates] = useState(false);
   const [title, setTitle] = useState('My Trello board');
   const [openMenuFor, setOpenMenuFor] = useState(null);
   const [composerFor, setComposerFor] = useState(null);
+  const [editingCard, setEditingCard] = useState(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [editingError, setEditingError] = useState('');
+  const [editingSaving, setEditingSaving] = useState(false);
+  const [composerError, setComposerError] = useState(null);
 
   const COLOR_MAP = {
     accent: '#8B5CF6',
@@ -143,40 +165,14 @@ export default function BoardsPage() {
     const rgb = hexToRgb(hex);
     if (!rgb) return '#fff';
     const { r, g, b } = rgb;
-    // Relative luminance
     const srgb = [r / 255, g / 255, b / 255].map((c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)));
     const L = 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
     return L > 0.5 ? '#0b1324' : '#ffffff';
   }
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(columns));
-    } catch {}
-  }, [columns]);
-
   useMemo(() => columns.length, [columns]);
 
   const overridesByColumn = loadOverrides();
-
-  function parseListId(colId) {
-    const m = String(colId).match(/^col-(\d+)/);
-    return m ? parseInt(m[1], 10) : null;
-  }
-
-  function ensureIds(cols) {
-    return cols.map((c, idx) => ({
-      id: c.id || `col-${idx}-${c.title?.toLowerCase().replace(/\s+/g, '-')}`,
-      title: c.title,
-      accent: c.accent || 'primary',
-      cards: (c.cards || []).map((card, i) => ({
-        id: String(card.id ?? `${c.title}-${i}`),
-        title: card.title,
-        badge: card.badge,
-        color: card.color || 'primary',
-      })),
-    }));
-  }
 
   function handleDragEnd(result) {
     const { destination, source, type } = result;
@@ -203,36 +199,86 @@ export default function BoardsPage() {
     });
   }
 
+  const openComposer = useCallback((columnId) => {
+    setComposerError(null);
+    setComposerFor(columnId);
+  }, []);
+
+  const closeComposer = useCallback(() => {
+    setComposerError(null);
+    setComposerFor(null);
+  }, []);
+
   async function handleAddCardSubmit(column, draftTitle) {
     const title = (draftTitle || '').trim();
     if (!title) return;
-    const token = getAuthToken();
-    const listId = parseListId(column.id);
-    const newCardLocal = {
-      id: String(Date.now()),
-      title,
-      badge: column.title,
-      color: column.accent || 'primary',
-    };
-    if (!token || !listId) {
-      // Local-only fallback
-      setColumns((cols) => cols.map((c) => c.id === column.id ? { ...c, cards: [...c.cards, newCardLocal] } : c));
-      setComposerFor(null);
+    const token = authToken;
+    const listId = column.listId ?? parseListId(column.id);
+    if (!listId) {
+      setComposerError('Unable to determine list. Please refresh.');
+      return;
+    }
+    if (!token) {
+      setComposerError('Please log in to add cards to this board.');
       return;
     }
     try {
       const created = await api.createCard(listId, { title, badge: column.title, color: column.accent }, token);
       const card = { id: String(created.id), title: created.title, badge: created.badge, color: created.color || (column.accent || 'primary') };
       setColumns((cols) => cols.map((c) => c.id === column.id ? { ...c, cards: [...c.cards, card] } : c));
-      setComposerFor(null);
+      closeComposer();
+      setComposerError(null);
     } catch (e) {
-      // Fallback to local on error to keep UX responsive
-      setColumns((cols) => cols.map((c) => c.id === column.id ? { ...c, cards: [...c.cards, newCardLocal] } : c));
-      setComposerFor(null);
+      setComposerError(e?.message || 'Failed to save card.');
     }
   }
 
-  function CardComposer({ onAdd, onCancel }) {
+  function openCardEditor(card, columnId) {
+    setEditingCard({ cardId: card.id, columnId });
+    setEditingTitle(card.title);
+    setEditingError('');
+  }
+
+  function closeCardEditor() {
+    setEditingCard(null);
+    setEditingTitle('');
+    setEditingError('');
+    setEditingSaving(false);
+  }
+
+  async function handleEditCardSave() {
+    if (!editingCard) return;
+    const nextTitle = (editingTitle || '').trim();
+    if (!nextTitle) {
+      setEditingError('Title is required');
+      return;
+    }
+
+    const token = authToken;
+    if (token) {
+      try {
+        setEditingSaving(true);
+        await api.updateCard(editingCard.cardId, { title: nextTitle }, token);
+      } catch (err) {
+        setEditingError(err?.message || 'Failed to update card');
+        setEditingSaving(false);
+        return;
+      }
+    }
+
+    setColumns((cols) => cols.map((col) => {
+      if (col.id !== editingCard.columnId) return col;
+      return {
+        ...col,
+        cards: col.cards.map((card) => (card.id === editingCard.cardId ? { ...card, title: nextTitle } : card)),
+      };
+    }));
+
+    setEditingSaving(false);
+    closeCardEditor();
+  }
+
+  function CardComposer({ onAdd, onCancel, error }) {
     const inputRef = useRef(null);
     const [value, setValue] = useState('');
     useEffect(() => { inputRef.current?.focus(); }, []);
@@ -242,7 +288,6 @@ export default function BoardsPage() {
       try {
         await onAdd?.(next);
       } catch {
-        // keep value so user can retry
       }
     };
     const handleCancel = () => {
@@ -274,6 +319,46 @@ export default function BoardsPage() {
         <div className="tadd-actions">
           <button type="button" className="tadd-confirm" onClick={handleSubmit}>Add card</button>
           <button type="button" className="tadd-cancel" onClick={handleCancel}>Cancel</button>
+        </div>
+        {error ? <div className="tadd-error">{error}</div> : null}
+      </div>
+    );
+  }
+
+  function CardEditModal({ title, onChange, onSave, onClose, saving, error }) {
+    const ref = useRef(null);
+    useEffect(() => {
+      function onDocClick(e) {
+        if (ref.current && !ref.current.contains(e.target)) onClose?.();
+      }
+      function onKey(e) {
+        if (e.key === 'Escape') onClose?.();
+      }
+      document.addEventListener('mousedown', onDocClick);
+      document.addEventListener('keydown', onKey);
+      return () => {
+        document.removeEventListener('mousedown', onDocClick);
+        document.removeEventListener('keydown', onKey);
+      };
+    }, [onClose]);
+    return (
+      <div className="card-edit-overlay" role="dialog" aria-modal="true">
+        <div className="card-edit-modal" ref={ref}>
+          <h3 className="card-edit-title">Edit card</h3>
+          <textarea
+            className="card-edit-input"
+            value={title}
+            onChange={(e) => onChange?.(e.target.value)}
+            rows={4}
+            autoFocus
+          />
+          {error ? <div className="card-edit-error">{error}</div> : null}
+          <div className="card-edit-actions">
+            <button type="button" className="card-edit-save" onClick={onSave} disabled={saving}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            <button type="button" className="card-edit-cancel" onClick={onClose} disabled={saving}>Cancel</button>
+          </div>
         </div>
       </div>
     );
@@ -318,7 +403,7 @@ export default function BoardsPage() {
   }
 
   useEffect(() => {
-    const token = getAuthToken();
+    const token = authToken;
     if (!token) return;
     let cancelled = false;
     (async () => {
@@ -334,18 +419,19 @@ export default function BoardsPage() {
         const detail = await api.getBoard(boardId, token);
         if (cancelled) return;
         setTitle(detail.title || 'My Trello board');
-        const mapped = (detail.lists || []).map((l) => ({
+        const mapped = ensureIds((detail.lists || []).map((l) => ({
           id: `col-${l.id}`,
+          listId: l.id,
           title: l.title,
           accent: l.accent || 'primary',
           cards: (l.cards || []).map((c) => ({ id: String(c.id), title: c.title, badge: c.badge, color: c.color || 'primary' }))
-        }));
+        })));
         setColumns(mapped);
       } catch (e) {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [authToken]);
 
   return (
     <div className="boards-layout">
@@ -441,11 +527,22 @@ export default function BoardsPage() {
                                           className="tcard"
                                           ref={cardProvided.innerRef}
                                           {...cardProvided.draggableProps}
-                                          {...cardProvided.dragHandleProps}
                                           style={cardProvided.draggableProps.style}
                                         >
-                                          <div className="tcard-badges">
-                                            <span className={`tbadge tbadge--${card.color}`} style={badgeStyle}>{card.badge}</span>
+                                          <div className="tcard-head" {...cardProvided.dragHandleProps}>
+                                            <div className="tcard-badges">
+                                              <span className={`tbadge tbadge--${card.color}`} style={badgeStyle}>{card.badge}</span>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              className="tcard-edit"
+                                              aria-label={`Edit ${card.title}`}
+                                              onClick={(e) => { e.stopPropagation(); openCardEditor(card, col.id); }}
+                                              onMouseDown={(e) => e.stopPropagation()}
+                                              onTouchStart={(e) => e.stopPropagation()}
+                                            >
+                                              <Icon name="edit" size={12} />
+                                            </button>
                                           </div>
                                           <div className="tcard-title">{card.title}</div>
                                           <div className="tcard-meta">
@@ -467,10 +564,11 @@ export default function BoardsPage() {
                                 {composerFor === col.id ? (
                                   <CardComposer
                                     onAdd={(value) => handleAddCardSubmit(col, value)}
-                                    onCancel={() => setComposerFor(null)}
+                                    onCancel={closeComposer}
+                                    error={composerError}
                                   />
                                 ) : (
-                                  <button type="button" className="tadd-card" onClick={() => setComposerFor(col.id)}>+ Add a card</button>
+                                  <button type="button" className="tadd-card" onClick={() => openComposer(col.id)}>+ Add a card</button>
                                 )}
                               </div>
                             )}
@@ -516,10 +614,20 @@ export default function BoardsPage() {
           open={showTemplates}
           onClose={() => setShowTemplates(false)}
           onSelect={(tpl) => {
-            setColumns(tpl.columns);
+            setColumns(ensureIds(tpl.columns));
             setShowTemplates(false);
           }}
         />
+        {editingCard && (
+          <CardEditModal
+            title={editingTitle}
+            onChange={setEditingTitle}
+            onSave={handleEditCardSave}
+            onClose={closeCardEditor}
+            saving={editingSaving}
+            error={editingError}
+          />
+        )}
       </section>
     </div>
   );

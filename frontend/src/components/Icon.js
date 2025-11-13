@@ -76,6 +76,14 @@ export default function Icon({ name, size = 16, strokeWidth = 1.8, className }) 
           <path d="M8 8l2 2 4-4" />
         </svg>
       );
+    case 'edit':
+      return (
+        <svg {...baseProps}>
+          <path d="M12 5h7" />
+          <path d="M5 20h3l11-11-3-3L5 17v3z" />
+          <path d="m14 7 3 3" />
+        </svg>
+      );
     case 'close':
       return (
         <svg {...baseProps}>
