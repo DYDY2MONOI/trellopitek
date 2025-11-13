@@ -195,7 +195,27 @@ export default function BoardsPage({ authToken }) {
       const sourceColIndex = cols.findIndex((col) => col.id === source.droppableId);
       const destColIndex = cols.findIndex((col) => col.id === destination.droppableId);
       if (sourceColIndex === -1 || destColIndex === -1) return cols;
-      return moveCardBetweenColumns(cols, sourceColIndex, destColIndex, source.index, destination.index);
+      const next = moveCardBetweenColumns(cols, sourceColIndex, destColIndex, source.index, destination.index);
+
+      const sourceCol = cols[sourceColIndex];
+      const movingCard = sourceCol?.cards[source.index];
+      const destColumn = next[destColIndex];
+      const updatedCard = destColumn?.cards[destination.index];
+
+      if (movingCard && destColumn && updatedCard && authToken) {
+        const listId = destColumn.listId;
+        if (listId) {
+          api.updateCard(movingCard.id, {
+            title: updatedCard.title,
+            badge: updatedCard.badge,
+            color: updatedCard.color,
+            listId,
+            position: destination.index,
+          }, authToken).catch(() => {});
+        }
+      }
+
+      return next;
     });
   }
 

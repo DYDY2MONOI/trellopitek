@@ -52,10 +52,10 @@ func (s *CardService) GetCardsByList(listID int) ([]Card, error) {
 	return out, rows.Err()
 }
 
-func (s *CardService) UpdateCard(id int, title, badge, color string) (*Card, error) {
+func (s *CardService) UpdateCard(id int, title, badge, color string, listID int, position int) (*Card, error) {
 	_, err := s.DB.Exec(
-		"UPDATE cards SET title=$1, badge=$2, color=$3 WHERE id=$4",
-		title, badge, color, id,
+		"UPDATE cards SET title=$1, badge=$2, color=$3, list_id=$4, position=$5 WHERE id=$6",
+		title, badge, color, listID, position, id,
 	)
 	if err != nil {
 		return nil, err

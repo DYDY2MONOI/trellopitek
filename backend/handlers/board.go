@@ -215,9 +215,11 @@ func (h *BoardHandler) UpdateCard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		Title *string `json:"title"`
-		Badge *string `json:"badge"`
-		Color *string `json:"color"`
+		Title    *string `json:"title"`
+		Badge    *string `json:"badge"`
+		Color    *string `json:"color"`
+		ListID   *int    `json:"listId"`
+		Position *int    `json:"position"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid payload", http.StatusBadRequest)
@@ -242,7 +244,21 @@ func (h *BoardHandler) UpdateCard(w http.ResponseWriter, r *http.Request) {
 		newColor = strings.TrimSpace(*body.Color)
 	}
 
-	updated, err := h.Cards.UpdateCard(id, newTitle, newBadge, newColor)
+	newListID := existing.ListID
+	if body.ListID != nil && *body.ListID > 0 {
+		if _, err := h.Lists.GetListByID(*body.ListID); err != nil {
+			http.Error(w, "list not found", http.StatusBadRequest)
+			return
+		}
+		newListID = *body.ListID
+	}
+
+	newPosition := existing.Position
+	if body.Position != nil && *body.Position >= 0 {
+		newPosition = *body.Position
+	}
+
+	updated, err := h.Cards.UpdateCard(id, newTitle, newBadge, newColor, newListID, newPosition)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
