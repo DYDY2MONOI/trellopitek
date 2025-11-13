@@ -32,9 +32,12 @@
 .btm-close {
   border: none;
   background: transparent;
-  font-size: 1.25rem;
   cursor: pointer;
   color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem;
 }
 
 .btm-grid {
@@ -68,4 +71,3 @@
   opacity: 0.8;
   font-size: 0.9rem;
 }
-

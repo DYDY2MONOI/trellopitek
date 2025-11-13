@@ -3,6 +3,7 @@ import './App.css';
 import LogoLoop from './components/LogoLoop';
 import Login from './components/Login';
 import Register from './components/Register';
+import Icon from './components/Icon';
 import {
   VisaLogo,
   CoinbaseLogo,
@@ -122,6 +123,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authView, setAuthView] = useState(null);
+  const [authTokenState, setAuthTokenState] = useState(() => getAuthToken());
   const [columns] = useState(boardColumns);
   const navigate = useNavigate();
   const location = useLocation();
@@ -132,11 +134,9 @@ function App() {
     try {
       window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
     } catch (error) {
-      // Ignore storage errors (e.g., private mode)
     }
   }, [theme]);
 
-  // Decode JWT payload without verifying signature (UI convenience)
   const decodeJwt = (token) => {
     try {
       const base64Url = token.split('.')[1];
@@ -155,19 +155,16 @@ function App() {
   };
 
   useEffect(() => {
-    // Check for existing token on mount
     const savedToken = getAuthToken();
     if (savedToken) {
-      // Optimistically set user from token claims so the session persists visually on reload
+      setAuthTokenState(savedToken);
       const claims = decodeJwt(savedToken);
       if (claims && claims.email) {
         setUser({ id: claims.user_id, email: claims.email });
         setIsAuthenticated(true);
       }
-      // Verify with server to ensure the token is still valid
       verifyToken(savedToken);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const verifyToken = async (authToken) => {
@@ -176,10 +173,11 @@ function App() {
       const userData = await api.getMe(authToken);
       setUser(userData);
       setIsAuthenticated(true);
+      setAuthTokenState(authToken);
     } catch (error) {
-      // Only clear token on explicit unauthorized responses
       if (error?.status === 401 || error?.status === 403) {
         setAuthToken(null);
+        setAuthTokenState(null);
         setIsAuthenticated(false);
       }
     }
@@ -189,16 +187,19 @@ function App() {
     setUser(userData);
     setIsAuthenticated(true);
     setAuthView(null);
+    setAuthTokenState(authToken);
   };
 
   const handleRegister = (userData, authToken) => {
     setUser(userData);
     setIsAuthenticated(true);
     setAuthView(null);
+    setAuthTokenState(authToken);
   };
 
   const handleLogout = () => {
     setAuthToken(null);
+    setAuthTokenState(null);
     setUser(null);
     setIsAuthenticated(false);
     setAuthView('login');
@@ -294,7 +295,7 @@ function App() {
       </header>
 
       {location.pathname.startsWith('/boards') ? (
-        <BoardsPage />
+        <BoardsPage authToken={authTokenState} />
       ) : (
       <main className="page">
         <section className="hero" id="product">
@@ -336,7 +337,8 @@ function App() {
                         <p>{card.title}</p>
                         <footer className="card-footer">
                           <span className="card-checklist">
-                            <span aria-hidden>☑</span> 3/5
+                            <Icon name="checklist" size={14} />
+                            <span>3/5</span>
                           </span>
                           <span className="card-avatars">
                             <span className="mini-avatar" aria-hidden>JD</span>

@@ -1,4 +1,5 @@
 import React from 'react';
+import Icon from './Icon';
 import './BoardTemplatesModal.css';
 
 const templates = [
@@ -56,7 +57,9 @@ const BoardTemplatesModal = ({ open, onClose, onSelect }) => {
       <div className="btm-modal">
         <header className="btm-header">
           <h2 id="btm-title">Choose a template</h2>
-          <button type="button" className="btm-close" onClick={onClose} aria-label="Close">✕</button>
+          <button type="button" className="btm-close" onClick={onClose} aria-label="Close">
+            <Icon name="close" size={16} />
+          </button>
         </header>
         <div className="btm-grid">
           {templates.map((tpl) => (

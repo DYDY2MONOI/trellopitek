@@ -1,53 +1,117 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import BoardTemplatesModal from '../components/BoardTemplatesModal';
+import Icon from '../components/Icon';
 import './BoardsPage.css';
-import { DndContext, closestCorners, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy, horizontalListSortingStrategy } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { getAuthToken, api } from '../services/api';
-
-const STORAGE_KEY = 'trellomirror-board-columns-v2';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { api } from '../services/api';
 
 const defaultKanban = [
   {
     id: 'col-ideas',
+    listId: null,
     title: 'Ideas',
     accent: 'accent',
     cards: []
   },
   {
     id: 'col-progress',
+    listId: null,
     title: 'In Progress',
     accent: 'primary',
     cards: []
   },
   {
     id: 'col-review',
+    listId: null,
     title: 'Review',
     accent: 'warning',
     cards: []
   },
   {
     id: 'col-done',
+    listId: null,
     title: 'Done',
     accent: 'success',
     cards: []
   }
 ];
 
-export default function BoardsPage() {
-  const [columns, setColumns] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      const data = saved ? JSON.parse(saved) : defaultKanban;
-      return ensureIds(data);
-    } catch {
-      return defaultKanban;
-    }
+function parseListId(colId) {
+  const m = String(colId).match(/^col-(\d+)/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function ensureIds(cols) {
+  return cols.map((c, idx) => {
+    const generatedId = c.id || `col-${idx}-${c.title?.toLowerCase().replace(/\s+/g, '-')}`;
+    return {
+      id: generatedId,
+      listId: c.listId ?? parseListId(generatedId) ?? null,
+      title: c.title,
+      accent: c.accent || 'primary',
+      cards: (c.cards || []).map((card, i) => ({
+        id: String(card.id ?? `${c.title}-${i}`),
+        title: card.title,
+        badge: card.badge,
+        color: card.color || 'primary',
+      })),
+    };
   });
+}
+
+function reorder(list, startIndex, endIndex) {
+  if (startIndex === endIndex) return list;
+  const result = Array.from(list);
+  const [removed] = result.splice(startIndex, 1);
+  if (!removed) return list;
+  result.splice(endIndex, 0, removed);
+  return result;
+}
+
+function moveCardBetweenColumns(columns, sourceColIndex, destColIndex, sourceIndex, destIndex) {
+  if (sourceColIndex === destColIndex) {
+    const column = columns[sourceColIndex];
+    if (!column) return columns;
+    const reordered = reorder(column.cards, sourceIndex, destIndex);
+    if (reordered === column.cards) return columns;
+    const updated = [...columns];
+    updated[sourceColIndex] = { ...column, cards: reordered };
+    return updated;
+  }
+
+  const sourceCol = columns[sourceColIndex];
+  const destCol = columns[destColIndex];
+  if (!sourceCol || !destCol) return columns;
+
+  const sourceCards = Array.from(sourceCol.cards);
+  const [moved] = sourceCards.splice(sourceIndex, 1);
+  if (!moved) return columns;
+
+  const destCards = Array.from(destCol.cards);
+  const movedIntoDest = {
+    ...moved,
+    badge: destCol.title,
+    color: destCol.accent || moved.color,
+  };
+  destCards.splice(destIndex, 0, movedIntoDest);
+
+  const updated = [...columns];
+  updated[sourceColIndex] = { ...sourceCol, cards: sourceCards };
+  updated[destColIndex] = { ...destCol, cards: destCards };
+  return updated;
+}
+
+export default function BoardsPage({ authToken }) {
+  const [columns, setColumns] = useState(() => ensureIds(defaultKanban));
   const [showTemplates, setShowTemplates] = useState(false);
   const [title, setTitle] = useState('My Trello board');
   const [openMenuFor, setOpenMenuFor] = useState(null);
+  const [composerFor, setComposerFor] = useState(null);
+  const [editingCard, setEditingCard] = useState(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [editingError, setEditingError] = useState('');
+  const [editingSaving, setEditingSaving] = useState(false);
+  const [composerError, setComposerError] = useState(null);
 
   const COLOR_MAP = {
     accent: '#8B5CF6',
@@ -101,150 +165,200 @@ export default function BoardsPage() {
     const rgb = hexToRgb(hex);
     if (!rgb) return '#fff';
     const { r, g, b } = rgb;
-    // Relative luminance
     const srgb = [r / 255, g / 255, b / 255].map((c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)));
     const L = 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
     return L > 0.5 ? '#0b1324' : '#ffffff';
   }
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(columns));
-    } catch {}
-  }, [columns]);
-
   useMemo(() => columns.length, [columns]);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
-  );
+  const overridesByColumn = loadOverrides();
 
-  function ensureIds(cols) {
-    return cols.map((c, idx) => ({
-      id: c.id || `col-${idx}-${c.title?.toLowerCase().replace(/\s+/g, '-')}`,
-      title: c.title,
-      accent: c.accent || 'primary',
-      cards: (c.cards || []).map((card, i) => ({
-        id: String(card.id ?? `${c.title}-${i}`),
-        title: card.title,
-        badge: card.badge,
-        color: card.color || 'primary',
-      })),
-    }));
-  }
+  function handleDragEnd(result) {
+    const { destination, source, type } = result;
+    if (!destination) return;
 
-  function handleDragEnd(event) {
-    const { active, over } = event;
-    if (!over) return;
-
-    const activeColIndex = columns.findIndex(c => c.id === active.id);
-    const overColIndex = columns.findIndex(c => c.id === over.id);
-    if (activeColIndex !== -1 && overColIndex !== -1) {
-      if (activeColIndex !== overColIndex) {
-        setColumns((cols) => arrayMove(cols, activeColIndex, overColIndex));
-      }
+    if (type === 'COLUMN') {
+      if (destination.index === source.index) return;
+      setColumns((cols) => reorder(cols, source.index, destination.index));
       return;
     }
 
-    const fromColIndex = columns.findIndex(c => c.cards.some(card => String(card.id) === String(active.id)));
-    if (fromColIndex === -1) return;
-    const toColIndexCandidate = columns.findIndex(c => c.cards.some(card => String(card.id) === String(over.id)) || c.id === over.id);
-    const toColIndex = toColIndexCandidate === -1 ? fromColIndex : toColIndexCandidate;
+    if (
+      destination.droppableId === source.droppableId &&
+      destination.index === source.index
+    ) {
+      return;
+    }
 
-    const fromCol = columns[fromColIndex];
-    const toCol = columns[toColIndex];
-    const fromIndex = fromCol.cards.findIndex(card => String(card.id) === String(active.id));
-    let toIndex = toCol.cards.findIndex(card => String(card.id) === String(over.id));
-    if (toIndex === -1) toIndex = toCol.cards.length;
+    setColumns((cols) => {
+      const sourceColIndex = cols.findIndex((col) => col.id === source.droppableId);
+      const destColIndex = cols.findIndex((col) => col.id === destination.droppableId);
+      if (sourceColIndex === -1 || destColIndex === -1) return cols;
+      return moveCardBetweenColumns(cols, sourceColIndex, destColIndex, source.index, destination.index);
+    });
+  }
 
-    if (fromColIndex === toColIndex) {
-      if (fromIndex !== toIndex) {
-        const newCards = arrayMove(fromCol.cards, fromIndex, toIndex);
-        const updated = [...columns];
-        updated[fromColIndex] = { ...fromCol, cards: newCards };
-        setColumns(updated);
-      }
-    } else {
-      const moving = fromCol.cards[fromIndex];
-      const newFrom = Array.from(fromCol.cards);
-      newFrom.splice(fromIndex, 1);
-      const newTo = Array.from(toCol.cards);
-      newTo.splice(toIndex, 0, moving);
-      const updated = [...columns];
-      updated[fromColIndex] = { ...fromCol, cards: newFrom };
-      updated[toColIndex] = { ...toCol, cards: newTo };
-      setColumns(updated);
+  const openComposer = useCallback((columnId) => {
+    setComposerError(null);
+    setComposerFor(columnId);
+  }, []);
+
+  const closeComposer = useCallback(() => {
+    setComposerError(null);
+    setComposerFor(null);
+  }, []);
+
+  async function handleAddCardSubmit(column, draftTitle) {
+    const title = (draftTitle || '').trim();
+    if (!title) return;
+    const token = authToken;
+    const listId = column.listId ?? parseListId(column.id);
+    if (!listId) {
+      setComposerError('Unable to determine list. Please refresh.');
+      return;
+    }
+    if (!token) {
+      setComposerError('Please log in to add cards to this board.');
+      return;
+    }
+    try {
+      const created = await api.createCard(listId, { title, badge: column.title, color: column.accent }, token);
+      const card = { id: String(created.id), title: created.title, badge: created.badge, color: created.color || (column.accent || 'primary') };
+      setColumns((cols) => cols.map((c) => c.id === column.id ? { ...c, cards: [...c.cards, card] } : c));
+      closeComposer();
+      setComposerError(null);
+    } catch (e) {
+      setComposerError(e?.message || 'Failed to save card.');
     }
   }
 
-  function ColumnSortable({ column, children, onOpenMenu }) {
-    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: column.id });
-    const style = {
-      transform: CSS.Transform.toString(transform),
-      transition,
+  function openCardEditor(card, columnId) {
+    setEditingCard({ cardId: card.id, columnId });
+    setEditingTitle(card.title);
+    setEditingError('');
+  }
+
+  function closeCardEditor() {
+    setEditingCard(null);
+    setEditingTitle('');
+    setEditingError('');
+    setEditingSaving(false);
+  }
+
+  async function handleEditCardSave() {
+    if (!editingCard) return;
+    const nextTitle = (editingTitle || '').trim();
+    if (!nextTitle) {
+      setEditingError('Title is required');
+      return;
+    }
+
+    const token = authToken;
+    if (token) {
+      try {
+        setEditingSaving(true);
+        await api.updateCard(editingCard.cardId, { title: nextTitle }, token);
+      } catch (err) {
+        setEditingError(err?.message || 'Failed to update card');
+        setEditingSaving(false);
+        return;
+      }
+    }
+
+    setColumns((cols) => cols.map((col) => {
+      if (col.id !== editingCard.columnId) return col;
+      return {
+        ...col,
+        cards: col.cards.map((card) => (card.id === editingCard.cardId ? { ...card, title: nextTitle } : card)),
+      };
+    }));
+
+    setEditingSaving(false);
+    closeCardEditor();
+  }
+
+  function CardComposer({ onAdd, onCancel, error }) {
+    const inputRef = useRef(null);
+    const [value, setValue] = useState('');
+    useEffect(() => { inputRef.current?.focus(); }, []);
+    const handleSubmit = async () => {
+      const next = value.trim();
+      if (!next) return;
+      try {
+        await onAdd?.(next);
+      } catch {
+      }
     };
-    const overrides = loadOverrides();
-    const colHex = overrides[column.id] ? normHex(overrides[column.id]) : null;
-    const headerStyle = colHex ? { backgroundColor: colHex, color: textOn(colHex) } : undefined;
-    const listClass = colHex ? 'list' : `list list--${column.accent}`;
+    const handleCancel = () => {
+      setValue('');
+      onCancel?.();
+    };
+    const onKeyDown = (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSubmit();
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleCancel();
+      }
+    };
     return (
-      <article className={listClass} ref={setNodeRef} style={style} role="listitem">
-        <header className="list-header" {...attributes} {...listeners} style={{ cursor: 'grab', ...headerStyle }}>
-          <div className="list-title">
-            <span className="list-title-text">{column.title}</span>
-            <span className="list-count">{column.cards.length}</span>
-          </div>
-          <div className="list-actions">
-            <button className="list-action" type="button" aria-label="More" onClick={() => onOpenMenu(column)}>⋯</button>
-          </div>
-        </header>
-        {children}
-        {openMenuFor === column.id && (
-          <ListColorMenu
-            column={column}
-            presetMap={COLOR_MAP}
-            onClose={() => setOpenMenuFor(null)}
-            onSelectColor={(hexOrToken) => {
-              const o = loadOverrides();
-              if (isHex(hexOrToken)) {
-                o[column.id] = normHex(hexOrToken);
-              } else if (hexOrToken in COLOR_MAP) {
-                // store hex to be generic and decouple from tokens
-                o[column.id] = COLOR_MAP[hexOrToken];
-              }
-              saveOverrides(o);
-              // trigger rerender
-              setColumns([...columns]);
-              setOpenMenuFor(null);
-            }}
-          />
-        )}
-      </article>
+      <div className="tadd-composer">
+        <textarea
+          ref={inputRef}
+          className="tadd-input"
+          dir="ltr"
+          placeholder="Enter a title for this card..."
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={onKeyDown}
+          rows={3}
+        />
+        <div className="tadd-actions">
+          <button type="button" className="tadd-confirm" onClick={handleSubmit}>Add card</button>
+          <button type="button" className="tadd-cancel" onClick={handleCancel}>Cancel</button>
+        </div>
+        {error ? <div className="tadd-error">{error}</div> : null}
+      </div>
     );
   }
 
-  function CardSortable({ card, column }) {
-    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: String(card.id) });
-    const style = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-    };
-    const overrides = loadOverrides();
-    const hexFromOverride = overrides[column.id] ? normHex(overrides[column.id]) : null;
-    // Choose color: card token -> preset; else column override; fallback preset by column accent token
-    const tokenHex = COLOR_MAP[card.color] || null;
-    const columnTokenHex = COLOR_MAP[column.accent] || null;
-    const finalHex = hexFromOverride || tokenHex || columnTokenHex || COLOR_MAP.primary;
-    const badgeStyle = { backgroundColor: rgba(finalHex, 0.18), color: finalHex };
+  function CardEditModal({ title, onChange, onSave, onClose, saving, error }) {
+    const ref = useRef(null);
+    useEffect(() => {
+      function onDocClick(e) {
+        if (ref.current && !ref.current.contains(e.target)) onClose?.();
+      }
+      function onKey(e) {
+        if (e.key === 'Escape') onClose?.();
+      }
+      document.addEventListener('mousedown', onDocClick);
+      document.addEventListener('keydown', onKey);
+      return () => {
+        document.removeEventListener('mousedown', onDocClick);
+        document.removeEventListener('keydown', onKey);
+      };
+    }, [onClose]);
     return (
-      <div className="tcard" ref={setNodeRef} style={style} {...attributes} {...listeners}>
-        <div className="tcard-badges">
-          <span className={`tbadge tbadge--${card.color}`} style={badgeStyle}>{card.badge}</span>
-        </div>
-        <div className="tcard-title">{card.title}</div>
-        <div className="tcard-meta">
-          <span className="tmeta">👁️ 1</span>
-          <span className="tmeta">📄 0/6</span>
+      <div className="card-edit-overlay" role="dialog" aria-modal="true">
+        <div className="card-edit-modal" ref={ref}>
+          <h3 className="card-edit-title">Edit card</h3>
+          <textarea
+            className="card-edit-input"
+            value={title}
+            onChange={(e) => onChange?.(e.target.value)}
+            rows={4}
+            autoFocus
+          />
+          {error ? <div className="card-edit-error">{error}</div> : null}
+          <div className="card-edit-actions">
+            <button type="button" className="card-edit-save" onClick={onSave} disabled={saving}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            <button type="button" className="card-edit-cancel" onClick={onClose} disabled={saving}>Cancel</button>
+          </div>
         </div>
       </div>
     );
@@ -289,7 +403,7 @@ export default function BoardsPage() {
   }
 
   useEffect(() => {
-    const token = getAuthToken();
+    const token = authToken;
     if (!token) return;
     let cancelled = false;
     (async () => {
@@ -305,24 +419,27 @@ export default function BoardsPage() {
         const detail = await api.getBoard(boardId, token);
         if (cancelled) return;
         setTitle(detail.title || 'My Trello board');
-        const mapped = (detail.lists || []).map((l) => ({
+        const mapped = ensureIds((detail.lists || []).map((l) => ({
           id: `col-${l.id}`,
+          listId: l.id,
           title: l.title,
           accent: l.accent || 'primary',
           cards: (l.cards || []).map((c) => ({ id: String(c.id), title: c.title, badge: c.badge, color: c.color || 'primary' }))
-        }));
+        })));
         setColumns(mapped);
       } catch (e) {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [authToken]);
 
   return (
     <div className="boards-layout">
       <aside className="boards-sidebar" aria-label="Sidebar">
         <div className="sidebar-header">
-          <button type="button" className="sidebar-logo" aria-label="Workspace">▦</button>
+          <button type="button" className="sidebar-logo" aria-label="Workspace">
+            <Icon name="workspace" size={18} />
+          </button>
           <div className="sidebar-title">Inbox</div>
         </div>
         <div className="sidebar-add">
@@ -334,9 +451,15 @@ export default function BoardsPage() {
             Have an idea? Email it, forward it — however it pops up
           </p>
           <div className="sidebar-icons">
-            <button className="sidebar-icon" type="button" aria-label="Mail">✉️</button>
-            <button className="sidebar-icon" type="button" aria-label="Chrome">🌐</button>
-            <button className="sidebar-icon" type="button" aria-label="More">➕</button>
+            <button className="sidebar-icon" type="button" aria-label="Mail">
+              <Icon name="mail" size={18} />
+            </button>
+            <button className="sidebar-icon" type="button" aria-label="Web clipper">
+              <Icon name="globe" size={18} />
+            </button>
+            <button className="sidebar-icon" type="button" aria-label="Add integration">
+              <Icon name="plus" size={18} />
+            </button>
           </div>
           <div className="sidebar-privacy">A 100% private inbox</div>
         </div>
@@ -345,34 +468,140 @@ export default function BoardsPage() {
       <section className="boards-main">
         <header className="board-header">
           <div className="board-title-row">
-            <h1 className="board-title" contentEditable suppressContentEditableWarning onBlur={(e)=>setTitle(e.currentTarget.textContent || 'My Trello board')}>{title}</h1>
+            <h1 className="board-title" dir="ltr" contentEditable suppressContentEditableWarning onBlur={(e)=>setTitle(e.currentTarget.textContent || 'My Trello board')}>{title}</h1>
             <div className="board-actions">
-              <button type="button" className="board-action">⋯</button>
-              <button type="button" className="board-action">⭐</button>
+              <button type="button" className="board-action" aria-label="Board options">⋯</button>
+              <button type="button" className="board-action" aria-label="Star board">
+                <Icon name="star" size={16} />
+              </button>
               <button type="button" className="board-share">Share</button>
             </div>
           </div>
         </header>
 
-        <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-          <SortableContext items={columns.map(c => c.id)} strategy={horizontalListSortingStrategy}>
-            <div className="lists-wrapper" role="list" aria-label="Board lists">
-              {columns.map((col) => (
-                <ColumnSortable key={col.id} column={col} onOpenMenu={(c)=> setOpenMenuFor(c.id)}>
-                  <SortableContext items={col.cards.map(card => String(card.id))} strategy={verticalListSortingStrategy}>
-                    <div className="list-cards">
-                      {col.cards.map(card => (
-                        <CardSortable key={card.id} card={card} column={col} />
-                      ))}
-                      <button type="button" className="tadd-card">+ Add a card</button>
-                    </div>
-                  </SortableContext>
-                </ColumnSortable>
-              ))}
-              <button type="button" className="list list--adder">+ Add a list</button>
-            </div>
-          </SortableContext>
-        </DndContext>
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <Droppable droppableId="board" direction="horizontal" type="COLUMN">
+            {(boardProvided) => (
+              <div
+                className="lists-wrapper"
+                role="list"
+                aria-label="Board lists"
+                ref={boardProvided.innerRef}
+                {...boardProvided.droppableProps}
+              >
+                {columns.map((col, colIndex) => {
+                  const colOverrideHex = overridesByColumn[col.id] ? normHex(overridesByColumn[col.id]) : null;
+                  const headerStyle = colOverrideHex ? { backgroundColor: colOverrideHex, color: textOn(colOverrideHex) } : undefined;
+                  const listClass = colOverrideHex ? 'list' : `list list--${col.accent}`;
+                  return (
+                    <Draggable draggableId={col.id} index={colIndex} key={col.id}>
+                      {(colProvided) => (
+                        <article
+                          className={listClass}
+                          ref={colProvided.innerRef}
+                          role="listitem"
+                          {...colProvided.draggableProps}
+                          style={colProvided.draggableProps.style}
+                        >
+                          <header className="list-header" style={{ cursor: 'grab', ...headerStyle }} {...colProvided.dragHandleProps}>
+                            <div className="list-title">
+                              <span className="list-title-text">{col.title}</span>
+                              <span className="list-count">{col.cards.length}</span>
+                            </div>
+                            <div className="list-actions">
+                              <button className="list-action" type="button" aria-label="More" onClick={() => setOpenMenuFor(col.id)}>⋯</button>
+                            </div>
+                          </header>
+                          <Droppable droppableId={col.id} type="CARD">
+                            {(listProvided) => (
+                              <div className="list-cards" ref={listProvided.innerRef} {...listProvided.droppableProps}>
+                                {col.cards.map((card, cardIndex) => {
+                                  const tokenHex = COLOR_MAP[card.color] || null;
+                                  const columnTokenHex = COLOR_MAP[col.accent] || null;
+                                  const finalHex = colOverrideHex || tokenHex || columnTokenHex || COLOR_MAP.primary;
+                                  const badgeStyle = { backgroundColor: rgba(finalHex, 0.18), color: finalHex };
+                                  return (
+                                    <Draggable key={card.id} draggableId={String(card.id)} index={cardIndex}>
+                                      {(cardProvided) => (
+                                        <div
+                                          className="tcard"
+                                          ref={cardProvided.innerRef}
+                                          {...cardProvided.draggableProps}
+                                          style={cardProvided.draggableProps.style}
+                                        >
+                                          <div className="tcard-head" {...cardProvided.dragHandleProps}>
+                                            <div className="tcard-badges">
+                                              <span className={`tbadge tbadge--${card.color}`} style={badgeStyle}>{card.badge}</span>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              className="tcard-edit"
+                                              aria-label={`Edit ${card.title}`}
+                                              onClick={(e) => { e.stopPropagation(); openCardEditor(card, col.id); }}
+                                              onMouseDown={(e) => e.stopPropagation()}
+                                              onTouchStart={(e) => e.stopPropagation()}
+                                            >
+                                              <Icon name="edit" size={12} />
+                                            </button>
+                                          </div>
+                                          <div className="tcard-title">{card.title}</div>
+                                          <div className="tcard-meta">
+                                            <span className="tmeta">
+                                              <Icon name="eye" size={14} />
+                                              <span>1</span>
+                                            </span>
+                                            <span className="tmeta">
+                                              <Icon name="document" size={14} />
+                                              <span>0/6</span>
+                                            </span>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </Draggable>
+                                  );
+                                })}
+                                {listProvided.placeholder}
+                                {composerFor === col.id ? (
+                                  <CardComposer
+                                    onAdd={(value) => handleAddCardSubmit(col, value)}
+                                    onCancel={closeComposer}
+                                    error={composerError}
+                                  />
+                                ) : (
+                                  <button type="button" className="tadd-card" onClick={() => openComposer(col.id)}>+ Add a card</button>
+                                )}
+                              </div>
+                            )}
+                          </Droppable>
+                          {openMenuFor === col.id && (
+                            <ListColorMenu
+                              column={col}
+                              presetMap={COLOR_MAP}
+                              onClose={() => setOpenMenuFor(null)}
+                              onSelectColor={(hexOrToken) => {
+                                const o = loadOverrides();
+                                if (isHex(hexOrToken)) {
+                                  o[col.id] = normHex(hexOrToken);
+                                } else if (hexOrToken in COLOR_MAP) {
+                                  o[col.id] = COLOR_MAP[hexOrToken];
+                                }
+                                saveOverrides(o);
+                                setColumns([...columns]);
+                                setOpenMenuFor(null);
+                              }}
+                            />
+                          )}
+                        </article>
+                      )}
+                    </Draggable>
+                  );
+                })}
+                {boardProvided.placeholder}
+                <button type="button" className="list list--adder">+ Add a list</button>
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
 
         <div className="boards-toolbar" role="toolbar" aria-label="Board toolbar">
           <button type="button" className="toolbar-btn toolbar-btn--active">Inbox</button>
@@ -385,10 +614,20 @@ export default function BoardsPage() {
           open={showTemplates}
           onClose={() => setShowTemplates(false)}
           onSelect={(tpl) => {
-            setColumns(tpl.columns);
+            setColumns(ensureIds(tpl.columns));
             setShowTemplates(false);
           }}
         />
+        {editingCard && (
+          <CardEditModal
+            title={editingTitle}
+            onChange={setEditingTitle}
+            onSave={handleEditCardSave}
+            onClose={closeCardEditor}
+            saving={editingSaving}
+            error={editingError}
+          />
+        )}
       </section>
     </div>
   );
