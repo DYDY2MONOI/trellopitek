@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Avatar } from '../components/ui/Avatar';
+import { UserIcon, PaletteIcon, BellIcon, ShieldIcon, MonitorIcon, SunIcon, MoonIcon, CheckIcon } from '../components/ui/Icons';
 import './SettingsPage.css';
 
 /**
@@ -28,10 +29,10 @@ function SettingsPage({ user, theme, onToggleTheme, onLogout }) {
     };
 
     const tabs = [
-        { id: 'profile', label: 'Profile', icon: '👤' },
-        { id: 'appearance', label: 'Appearance', icon: '🎨' },
-        { id: 'notifications', label: 'Notifications', icon: '🔔' },
-        { id: 'security', label: 'Security', icon: '🔒' },
+        { id: 'profile', label: 'Profile', icon: UserIcon },
+        { id: 'appearance', label: 'Appearance', icon: PaletteIcon },
+        { id: 'notifications', label: 'Notifications', icon: BellIcon },
+        { id: 'security', label: 'Security', icon: ShieldIcon },
     ];
 
     return (
@@ -45,16 +46,21 @@ function SettingsPage({ user, theme, onToggleTheme, onLogout }) {
                 <div className="settings-layout">
                     {/* Sidebar Navigation */}
                     <nav className="settings-nav">
-                        {tabs.map((tab) => (
-                            <button
-                                key={tab.id}
-                                className={`settings-nav__item ${activeTab === tab.id ? 'settings-nav__item--active' : ''}`}
-                                onClick={() => setActiveTab(tab.id)}
-                            >
-                                <span className="settings-nav__icon">{tab.icon}</span>
-                                <span className="settings-nav__label">{tab.label}</span>
-                            </button>
-                        ))}
+                        {tabs.map((tab) => {
+                            const IconComponent = tab.icon;
+                            return (
+                                <button
+                                    key={tab.id}
+                                    className={`settings-nav__item ${activeTab === tab.id ? 'settings-nav__item--active' : ''}`}
+                                    onClick={() => setActiveTab(tab.id)}
+                                >
+                                    <span className="settings-nav__icon">
+                                        <IconComponent size={18} />
+                                    </span>
+                                    <span className="settings-nav__label">{tab.label}</span>
+                                </button>
+                            );
+                        })}
                     </nav>
 
                     {/* Content Area */}
@@ -115,7 +121,7 @@ function SettingsPage({ user, theme, onToggleTheme, onLogout }) {
                                                 loading={saving}
                                                 disabled={saving}
                                             >
-                                                {saved ? '✓ Saved!' : 'Save Changes'}
+                                                {saved ? <><CheckIcon size={16} /> Saved!</> : 'Save Changes'}
                                             </Button>
                                         </div>
                                     </div>
@@ -140,7 +146,9 @@ function SettingsPage({ user, theme, onToggleTheme, onLogout }) {
                                                     className={`theme-option ${theme === 'light' ? 'theme-option--active' : ''}`}
                                                     onClick={() => theme !== 'light' && onToggleTheme()}
                                                 >
-                                                    <span className="theme-option__icon">☀️</span>
+                                                    <span className="theme-option__icon">
+                                                        <SunIcon size={20} />
+                                                    </span>
                                                     <span className="theme-option__label">Light</span>
                                                     <span className="theme-option__preview theme-option__preview--light" />
                                                 </button>
@@ -148,7 +156,9 @@ function SettingsPage({ user, theme, onToggleTheme, onLogout }) {
                                                     className={`theme-option ${theme === 'dark' ? 'theme-option--active' : ''}`}
                                                     onClick={() => theme !== 'dark' && onToggleTheme()}
                                                 >
-                                                    <span className="theme-option__icon">🌙</span>
+                                                    <span className="theme-option__icon">
+                                                        <MoonIcon size={20} />
+                                                    </span>
                                                     <span className="theme-option__label">Dark</span>
                                                     <span className="theme-option__preview theme-option__preview--dark" />
                                                 </button>
@@ -254,7 +264,9 @@ function SettingsPage({ user, theme, onToggleTheme, onLogout }) {
                                             <p>Manage devices where you're currently logged in</p>
                                             <div className="session-list">
                                                 <div className="session-item session-item--current">
-                                                    <span className="session-item__icon">💻</span>
+                                                    <span className="session-item__icon">
+                                                        <MonitorIcon size={20} />
+                                                    </span>
                                                     <div className="session-item__info">
                                                         <strong>Current Session</strong>
                                                         <p>This device • Active now</p>
