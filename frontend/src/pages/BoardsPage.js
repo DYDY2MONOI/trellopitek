@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import BoardTemplatesModal from '../components/BoardTemplatesModal';
 import Icon from '../components/Icon';
 import './BoardsPage.css';
@@ -101,7 +102,7 @@ function moveCardBetweenColumns(columns, sourceColIndex, destColIndex, sourceInd
   return updated;
 }
 
-export default function BoardsPage({ authToken }) {
+export default function BoardsPage({ authToken, boardId }) {
   const [columns, setColumns] = useState(() => ensureIds(defaultKanban));
   const [showTemplates, setShowTemplates] = useState(false);
   const [title, setTitle] = useState('My Trello board');
@@ -112,6 +113,9 @@ export default function BoardsPage({ authToken }) {
   const [editingError, setEditingError] = useState('');
   const [editingSaving, setEditingSaving] = useState(false);
   const [composerError, setComposerError] = useState(null);
+  const [boardError, setBoardError] = useState(null);
+  const [boardLoading, setBoardLoading] = useState(true);
+  const navigate = useNavigate();
 
   const COLOR_MAP = {
     accent: '#8B5CF6',
@@ -424,18 +428,15 @@ export default function BoardsPage({ authToken }) {
 
   useEffect(() => {
     const token = authToken;
-    if (!token) return;
+    if (!token || !boardId) {
+      setBoardLoading(false);
+      return;
+    }
     let cancelled = false;
+    setBoardLoading(true);
+    setBoardError(null);
     (async () => {
       try {
-        const boards = await api.getBoards(token);
-        let boardId;
-        if (boards && boards.length > 0) {
-          boardId = boards[0].id;
-        } else {
-          const created = await api.createBoard('My Trello board', token);
-          boardId = created.id;
-        }
         const detail = await api.getBoard(boardId, token);
         if (cancelled) return;
         setTitle(detail.title || 'My Trello board');
@@ -447,11 +448,48 @@ export default function BoardsPage({ authToken }) {
           cards: (l.cards || []).map((c) => ({ id: String(c.id), title: c.title, badge: c.badge, color: c.color || 'primary' }))
         })));
         setColumns(mapped);
+        setBoardLoading(false);
       } catch (e) {
+        if (!cancelled) {
+          setBoardError('Unable to load this board.');
+          setBoardLoading(false);
+        }
       }
     })();
     return () => { cancelled = true; };
-  }, [authToken]);
+  }, [authToken, boardId]);
+
+  if (!authToken) {
+    return (
+      <div className="boards-layout boards-layout--empty">
+        <p className="boards-empty-message">Please log in to open your boards.</p>
+      </div>
+    );
+  }
+
+  if (!boardId) {
+    return (
+      <div className="boards-layout boards-layout--empty">
+        <p className="boards-empty-message">Select a board from <strong>/user/boards</strong> to get started.</p>
+      </div>
+    );
+  }
+
+  if (boardLoading) {
+    return (
+      <div className="boards-layout boards-layout--empty">
+        <p className="boards-empty-message">Loading board…</p>
+      </div>
+    );
+  }
+
+  if (boardError) {
+    return (
+      <div className="boards-layout boards-layout--empty">
+        <p className="boards-empty-message">{boardError}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="boards-layout">
@@ -486,6 +524,11 @@ export default function BoardsPage({ authToken }) {
       </aside>
 
       <section className="boards-main">
+        <div className="board-nav-row">
+          <button type="button" className="ghost-button board-back-btn" onClick={() => navigate('/user/boards')}>
+            ← All boards
+          </button>
+        </div>
         <header className="board-header">
           <div className="board-title-row">
             <h1 className="board-title" dir="ltr" contentEditable suppressContentEditableWarning onBlur={(e)=>setTitle(e.currentTarget.textContent || 'My Trello board')}>{title}</h1>
