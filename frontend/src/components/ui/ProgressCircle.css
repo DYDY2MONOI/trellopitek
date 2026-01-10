@@ -1,0 +1,67 @@
+/* ============ Progress Circle ============ */
+.progress-circle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.progress-circle__bg {
+    stroke: hsl(var(--muted));
+}
+
+.progress-circle__progress {
+    stroke: hsl(var(--primary));
+    transition: stroke-dashoffset 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Progress Circle Colors */
+.progress-circle--success .progress-circle__progress {
+    stroke: hsl(var(--success));
+}
+
+.progress-circle--warning .progress-circle__progress {
+    stroke: hsl(var(--warning));
+}
+
+.progress-circle--accent .progress-circle__progress {
+    stroke: hsl(var(--accent));
+}
+
+/* ============ Progress Bar ============ */
+.progress-bar {
+    position: relative;
+    width: 100%;
+    background: hsl(var(--muted));
+    border-radius: 9999px;
+    overflow: hidden;
+}
+
+.progress-bar--default {
+    height: 0.5rem;
+}
+
+.progress-bar--sm {
+    height: 0.25rem;
+}
+
+.progress-bar--lg {
+    height: 0.75rem;
+}
+
+.progress-bar__fill {
+    height: 100%;
+    background: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent)));
+    border-radius: 9999px;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.progress-bar__label {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.625rem;
+    font-weight: 600;
+    color: hsl(var(--primary-foreground));
+}

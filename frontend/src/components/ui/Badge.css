@@ -1,0 +1,80 @@
+/* ============ Badge Component ============ */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 9999px;
+    font-weight: 500;
+    transition: all var(--transition);
+    white-space: nowrap;
+}
+
+/* Sizes */
+.badge--size-default {
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
+}
+
+.badge--size-sm {
+    padding: 0.125rem 0.5rem;
+    font-size: 0.6875rem;
+}
+
+.badge--size-lg {
+    padding: 0.375rem 0.875rem;
+    font-size: 0.875rem;
+}
+
+/* Variants */
+.badge--default {
+    background: hsl(var(--muted));
+    color: hsl(var(--muted-foreground));
+}
+
+.badge--primary {
+    background: hsl(var(--primary) / 0.15);
+    color: hsl(var(--primary));
+}
+
+.badge--secondary {
+    background: hsl(var(--muted));
+    color: hsl(var(--muted-foreground));
+}
+
+.badge--success {
+    background: hsl(var(--success) / 0.15);
+    color: hsl(var(--success));
+}
+
+.badge--warning {
+    background: hsl(var(--warning) / 0.2);
+    color: hsl(38 92% 35%);
+}
+
+[data-theme='dark'] .badge--warning {
+    color: hsl(var(--warning));
+}
+
+.badge--destructive {
+    background: hsl(var(--destructive) / 0.15);
+    color: hsl(var(--destructive));
+}
+
+.badge--outline {
+    background: transparent;
+    border: 1px solid hsl(var(--border));
+    color: hsl(var(--foreground));
+}
+
+/* Priority Badge Dot */
+.priority-badge__dot {
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+/* Status Badge */
+.status-badge {
+    text-transform: capitalize;
+}

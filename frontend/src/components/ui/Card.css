@@ -1,0 +1,78 @@
+/* ============ Card Component ============ */
+.card {
+    background: hsl(var(--card));
+    color: hsl(var(--card-foreground));
+    border-radius: var(--radius-lg);
+    border: 1px solid hsl(var(--border));
+    box-shadow: var(--shadow-sm);
+    transition: all var(--transition);
+}
+
+.card--hoverable {
+    cursor: pointer;
+}
+
+.card--hoverable:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    border-color: hsl(var(--border) / 0.5);
+}
+
+/* Card Header */
+.card__header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    padding: 1.25rem 1.25rem 0;
+}
+
+/* Card Title */
+.card__title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.02em;
+    color: hsl(var(--foreground));
+    margin: 0;
+}
+
+/* Card Description */
+.card__description {
+    font-size: 0.875rem;
+    color: hsl(var(--muted-foreground));
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* Card Content */
+.card__content {
+    padding: 1.25rem;
+}
+
+.card__header+.card__content {
+    padding-top: 0.75rem;
+}
+
+/* Card Footer */
+.card__footer {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    border-top: 1px solid hsl(var(--border));
+    background: hsl(var(--muted) / 0.3);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+/* Special Card Variants */
+.card--glass {
+    background: hsl(var(--card) / 0.8);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.card--gradient {
+    background: linear-gradient(135deg,
+            hsl(var(--card)),
+            hsl(var(--muted) / 0.5));
+}

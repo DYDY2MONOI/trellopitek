@@ -1,42 +1,82 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import BoardTemplatesModal from '../components/BoardTemplatesModal';
-import Icon from '../components/Icon';
-import './BoardsPage.css';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { api } from '../services/api';
+import { Button } from '../components/ui/Button';
+import { Badge } from '../components/ui/Badge';
+import { PageHeader, PageContent } from '../components/layout/MainLayout';
+import './BoardsPage.css';
 
+// Icons
+const Icons = {
+  Star: ({ filled }) => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+  ),
+  MoreHorizontal: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="19" cy="12" r="1" />
+      <circle cx="5" cy="12" r="1" />
+    </svg>
+  ),
+  Eye: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  ),
+  CheckSquare: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <polyline points="9 11 12 14 22 4" />
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+    </svg>
+  ),
+  Edit: () => (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  ),
+  Plus: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  ),
+  X: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  ),
+  ArrowLeft: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <line x1="19" y1="12" x2="5" y2="12" />
+      <polyline points="12 19 5 12 12 5" />
+    </svg>
+  ),
+};
+
+// Column color mapping
+const ACCENT_COLORS = {
+  accent: { bg: 'hsl(263 70% 50% / 0.15)', color: 'hsl(263 70% 50%)', border: 'hsl(263 70% 50%)' },
+  primary: { bg: 'hsl(217 91% 60% / 0.15)', color: 'hsl(217 91% 60%)', border: 'hsl(217 91% 60%)' },
+  warning: { bg: 'hsl(45 93% 47% / 0.15)', color: 'hsl(38 92% 40%)', border: 'hsl(45 93% 47%)' },
+  success: { bg: 'hsl(160 84% 39% / 0.15)', color: 'hsl(160 84% 39%)', border: 'hsl(160 84% 39%)' },
+  destructive: { bg: 'hsl(0 84% 60% / 0.15)', color: 'hsl(0 84% 60%)', border: 'hsl(0 84% 60%)' },
+};
+
+// Default columns
 const defaultKanban = [
-  {
-    id: 'col-ideas',
-    listId: null,
-    title: 'Ideas',
-    accent: 'accent',
-    cards: []
-  },
-  {
-    id: 'col-progress',
-    listId: null,
-    title: 'In Progress',
-    accent: 'primary',
-    cards: []
-  },
-  {
-    id: 'col-review',
-    listId: null,
-    title: 'Review',
-    accent: 'warning',
-    cards: []
-  },
-  {
-    id: 'col-done',
-    listId: null,
-    title: 'Done',
-    accent: 'success',
-    cards: []
-  }
+  { id: 'col-ideas', listId: null, title: 'Ideas', accent: 'accent', cards: [] },
+  { id: 'col-progress', listId: null, title: 'In Progress', accent: 'primary', cards: [] },
+  { id: 'col-review', listId: null, title: 'Review', accent: 'warning', cards: [] },
+  { id: 'col-done', listId: null, title: 'Done', accent: 'success', cards: [] },
 ];
 
+// Helpers
 function parseListId(colId) {
   const m = String(colId).match(/^col-(\d+)/);
   return m ? parseInt(m[1], 10) : null;
@@ -102,83 +142,63 @@ function moveCardBetweenColumns(columns, sourceColIndex, destColIndex, sourceInd
   return updated;
 }
 
-export default function BoardsPage({ authToken, boardId }) {
+// ============ Main Component ============
+export default function BoardsPage({ authToken }) {
+  const { boardId } = useParams();
+  const navigate = useNavigate();
+
   const [columns, setColumns] = useState(() => ensureIds(defaultKanban));
-  const [showTemplates, setShowTemplates] = useState(false);
-  const [title, setTitle] = useState('My Trello board');
-  const [openMenuFor, setOpenMenuFor] = useState(null);
+  const [title, setTitle] = useState('My Board');
+  const [isStarred, setIsStarred] = useState(false);
   const [composerFor, setComposerFor] = useState(null);
+  const [composerError, setComposerError] = useState(null);
   const [editingCard, setEditingCard] = useState(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [editingError, setEditingError] = useState('');
   const [editingSaving, setEditingSaving] = useState(false);
-  const [composerError, setComposerError] = useState(null);
-  const [boardError, setBoardError] = useState(null);
   const [boardLoading, setBoardLoading] = useState(true);
-  const navigate = useNavigate();
+  const [boardError, setBoardError] = useState(null);
 
-  const COLOR_MAP = {
-    accent: '#8B5CF6',
-    primary: '#2563EB',
-    warning: '#EAB308',
-    success: '#059669',
-    inbox: '#475569',
-  };
-
-  const colorOverridesKey = 'trellomirror-column-colors-v1';
-
-  const loadOverrides = useCallback(() => {
-    try {
-      const raw = localStorage.getItem(colorOverridesKey);
-      return raw ? JSON.parse(raw) : {};
-    } catch {
-      return {};
+  // Load board data
+  useEffect(() => {
+    if (!authToken || !boardId) {
+      setBoardLoading(false);
+      return;
     }
-  }, []);
+    let cancelled = false;
+    setBoardLoading(true);
+    setBoardError(null);
+    (async () => {
+      try {
+        const detail = await api.getBoard(boardId, authToken);
+        if (cancelled) return;
+        setTitle(detail.title || 'My Board');
+        const mapped = ensureIds((detail.lists || []).map((l) => ({
+          id: `col-${l.id}`,
+          listId: l.id,
+          title: l.title,
+          accent: l.accent || 'primary',
+          cards: (l.cards || []).map((c) => ({
+            id: String(c.id),
+            title: c.title,
+            badge: c.badge,
+            color: c.color || 'primary',
+          })),
+        })));
+        setColumns(mapped);
+        setBoardLoading(false);
+      } catch (e) {
+        if (!cancelled) {
+          setBoardError('Unable to load this board.');
+          setBoardLoading(false);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [authToken, boardId]);
 
-  const saveOverrides = useCallback((overrides) => {
-    try { localStorage.setItem(colorOverridesKey, JSON.stringify(overrides)); } catch {}
-  }, []);
-
-  function isHex(v) {
-    return typeof v === 'string' && /^#?[0-9a-fA-F]{6}$/.test(v);
-  }
-
-  function normHex(v) {
-    if (!isHex(v)) return null;
-    return v.startsWith('#') ? v : `#${v}`;
-  }
-
-  function hexToRgb(hex) {
-    const h = normHex(hex);
-    if (!h) return null;
-    const bigint = parseInt(h.slice(1), 16);
-    const r = (bigint >> 16) & 255;
-    const g = (bigint >> 8) & 255;
-    const b = bigint & 255;
-    return { r, g, b };
-  }
-
-  function rgba(hex, a) {
-    const rgb = hexToRgb(hex);
-    if (!rgb) return undefined;
-    return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${a})`;
-  }
-
-  function textOn(hex) {
-    const rgb = hexToRgb(hex);
-    if (!rgb) return '#fff';
-    const { r, g, b } = rgb;
-    const srgb = [r / 255, g / 255, b / 255].map((c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)));
-    const L = 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
-    return L > 0.5 ? '#0b1324' : '#ffffff';
-  }
-
-  useMemo(() => columns.length, [columns]);
-
-  const overridesByColumn = loadOverrides();
-
-  function handleDragEnd(result) {
+  // Drag and drop handler
+  const handleDragEnd = useCallback((result) => {
     const { destination, source, type } = result;
     if (!destination) return;
 
@@ -188,10 +208,7 @@ export default function BoardsPage({ authToken, boardId }) {
       return;
     }
 
-    if (
-      destination.droppableId === source.droppableId &&
-      destination.index === source.index
-    ) {
+    if (destination.droppableId === source.droppableId && destination.index === source.index) {
       return;
     }
 
@@ -201,6 +218,7 @@ export default function BoardsPage({ authToken, boardId }) {
       if (sourceColIndex === -1 || destColIndex === -1) return cols;
       const next = moveCardBetweenColumns(cols, sourceColIndex, destColIndex, source.index, destination.index);
 
+      // Update card in API
       const sourceCol = cols[sourceColIndex];
       const movingCard = sourceCol?.cards[source.index];
       const destColumn = next[destColIndex];
@@ -215,14 +233,15 @@ export default function BoardsPage({ authToken, boardId }) {
             color: updatedCard.color,
             listId,
             position: destination.index,
-          }, authToken).catch(() => {});
+          }, authToken).catch(() => { });
         }
       }
 
       return next;
     });
-  }
+  }, [authToken]);
 
+  // Composer handlers
   const openComposer = useCallback((columnId) => {
     setComposerError(null);
     setComposerFor(columnId);
@@ -233,44 +252,50 @@ export default function BoardsPage({ authToken, boardId }) {
     setComposerFor(null);
   }, []);
 
-  async function handleAddCardSubmit(column, draftTitle) {
-    const title = (draftTitle || '').trim();
-    if (!title) return;
-    const token = authToken;
+  const handleAddCard = async (column, draftTitle) => {
+    const cardTitle = (draftTitle || '').trim();
+    if (!cardTitle) return;
+
     const listId = column.listId ?? parseListId(column.id);
     if (!listId) {
       setComposerError('Unable to determine list. Please refresh.');
       return;
     }
-    if (!token) {
-      setComposerError('Please log in to add cards to this board.');
+    if (!authToken) {
+      setComposerError('Please log in to add cards.');
       return;
     }
+
     try {
-      const created = await api.createCard(listId, { title, badge: column.title, color: column.accent }, token);
-      const card = { id: String(created.id), title: created.title, badge: created.badge, color: created.color || (column.accent || 'primary') };
+      const created = await api.createCard(listId, { title: cardTitle, badge: column.title, color: column.accent }, authToken);
+      const card = {
+        id: String(created.id),
+        title: created.title,
+        badge: created.badge,
+        color: created.color || column.accent || 'primary',
+      };
       setColumns((cols) => cols.map((c) => c.id === column.id ? { ...c, cards: [...c.cards, card] } : c));
       closeComposer();
-      setComposerError(null);
     } catch (e) {
       setComposerError(e?.message || 'Failed to save card.');
     }
-  }
+  };
 
-  function openCardEditor(card, columnId) {
+  // Card editor handlers
+  const openCardEditor = (card, columnId) => {
     setEditingCard({ cardId: card.id, columnId });
     setEditingTitle(card.title);
     setEditingError('');
-  }
+  };
 
-  function closeCardEditor() {
+  const closeCardEditor = () => {
     setEditingCard(null);
     setEditingTitle('');
     setEditingError('');
     setEditingSaving(false);
-  }
+  };
 
-  async function handleEditCardSave() {
+  const handleEditCardSave = async () => {
     if (!editingCard) return;
     const nextTitle = (editingTitle || '').trim();
     if (!nextTitle) {
@@ -278,11 +303,10 @@ export default function BoardsPage({ authToken, boardId }) {
       return;
     }
 
-    const token = authToken;
-    if (token) {
+    if (authToken) {
       try {
         setEditingSaving(true);
-        await api.updateCard(editingCard.cardId, { title: nextTitle }, token);
+        await api.updateCard(editingCard.cardId, { title: nextTitle }, authToken);
       } catch (err) {
         setEditingError(err?.message || 'Failed to update card');
         setEditingSaving(false);
@@ -294,404 +318,346 @@ export default function BoardsPage({ authToken, boardId }) {
       if (col.id !== editingCard.columnId) return col;
       return {
         ...col,
-        cards: col.cards.map((card) => (card.id === editingCard.cardId ? { ...card, title: nextTitle } : card)),
+        cards: col.cards.map((card) =>
+          card.id === editingCard.cardId ? { ...card, title: nextTitle } : card
+        ),
       };
     }));
 
     setEditingSaving(false);
     closeCardEditor();
-  }
+  };
 
-  function CardComposer({ onAdd, onCancel, error }) {
-    const inputRef = useRef(null);
-    const [value, setValue] = useState('');
-    useEffect(() => { inputRef.current?.focus(); }, []);
-    const handleSubmit = async () => {
-      const next = value.trim();
-      if (!next) return;
-      try {
-        await onAdd?.(next);
-      } catch {
-      }
-    };
-    const handleCancel = () => {
-      setValue('');
-      onCancel?.();
-    };
-    const onKeyDown = (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSubmit();
-      }
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        handleCancel();
-      }
-    };
-    return (
-      <div className="tadd-composer">
-        <textarea
-          ref={inputRef}
-          className="tadd-input"
-          dir="ltr"
-          placeholder="Enter a title for this card..."
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={onKeyDown}
-          rows={3}
-        />
-        <div className="tadd-actions">
-          <button type="button" className="tadd-confirm" onClick={handleSubmit}>Add card</button>
-          <button type="button" className="tadd-cancel" onClick={handleCancel}>Cancel</button>
-        </div>
-        {error ? <div className="tadd-error">{error}</div> : null}
-      </div>
-    );
-  }
-
-  function CardEditModal({ title, onChange, onSave, onClose, saving, error }) {
-    const ref = useRef(null);
-    useEffect(() => {
-      function onDocClick(e) {
-        if (ref.current && !ref.current.contains(e.target)) onClose?.();
-      }
-      function onKey(e) {
-        if (e.key === 'Escape') onClose?.();
-      }
-      document.addEventListener('mousedown', onDocClick);
-      document.addEventListener('keydown', onKey);
-      return () => {
-        document.removeEventListener('mousedown', onDocClick);
-        document.removeEventListener('keydown', onKey);
-      };
-    }, [onClose]);
-    return (
-      <div className="card-edit-overlay" role="dialog" aria-modal="true">
-        <div className="card-edit-modal" ref={ref}>
-          <h3 className="card-edit-title">Edit card</h3>
-          <textarea
-            className="card-edit-input"
-            value={title}
-            onChange={(e) => onChange?.(e.target.value)}
-            rows={4}
-            autoFocus
-          />
-          {error ? <div className="card-edit-error">{error}</div> : null}
-          <div className="card-edit-actions">
-            <button type="button" className="card-edit-save" onClick={onSave} disabled={saving}>
-              {saving ? 'Saving…' : 'Save'}
-            </button>
-            <button type="button" className="card-edit-cancel" onClick={onClose} disabled={saving}>Cancel</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  function ListColorMenu({ column, presetMap, onClose, onSelectColor }) {
-    const ref = useRef(null);
-    useEffect(() => {
-      function onDocClick(e) {
-        if (ref.current && !ref.current.contains(e.target)) onClose?.();
-      }
-      document.addEventListener('mousedown', onDocClick);
-      return () => document.removeEventListener('mousedown', onDocClick);
-    }, [onClose]);
-
-    const presets = Object.entries(presetMap);
-    return (
-      <div className="list-menu" ref={ref} role="dialog" aria-label="Choose column color">
-        <div className="list-menu-row">
-          {presets.map(([key, hex]) => (
-            <button
-              key={key}
-              className="color-swatch"
-              style={{ backgroundColor: hex }}
-              title={`${column.title} – ${key}`}
-              onClick={() => onSelectColor?.(key)}
-            />
-          ))}
-        </div>
-        <div className="list-menu-row">
-          <input
-            type="color"
-            aria-label="Custom color"
-            className="color-input"
-            defaultValue="#8B5CF6"
-            onChange={(e) => onSelectColor?.(e.target.value)}
-          />
-          <button className="menu-close" type="button" onClick={onClose}>Close</button>
-        </div>
-      </div>
-    );
-  }
-
-  useEffect(() => {
-    const token = authToken;
-    if (!token || !boardId) {
-      setBoardLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setBoardLoading(true);
-    setBoardError(null);
-    (async () => {
-      try {
-        const detail = await api.getBoard(boardId, token);
-        if (cancelled) return;
-        setTitle(detail.title || 'My Trello board');
-        const mapped = ensureIds((detail.lists || []).map((l) => ({
-          id: `col-${l.id}`,
-          listId: l.id,
-          title: l.title,
-          accent: l.accent || 'primary',
-          cards: (l.cards || []).map((c) => ({ id: String(c.id), title: c.title, badge: c.badge, color: c.color || 'primary' }))
-        })));
-        setColumns(mapped);
-        setBoardLoading(false);
-      } catch (e) {
-        if (!cancelled) {
-          setBoardError('Unable to load this board.');
-          setBoardLoading(false);
-        }
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [authToken, boardId]);
-
-  if (!authToken) {
-    return (
-      <div className="boards-layout boards-layout--empty">
-        <p className="boards-empty-message">Please log in to open your boards.</p>
-      </div>
-    );
-  }
-
-  if (!boardId) {
-    return (
-      <div className="boards-layout boards-layout--empty">
-        <p className="boards-empty-message">Select a board from <strong>/user/boards</strong> to get started.</p>
-      </div>
-    );
-  }
-
+  // Loading state
   if (boardLoading) {
     return (
-      <div className="boards-layout boards-layout--empty">
-        <p className="boards-empty-message">Loading board…</p>
-      </div>
+      <>
+        <PageHeader title="Loading..." kicker="Board" />
+        <PageContent>
+          <div className="board-loading">
+            <div className="app-loading__spinner" />
+            <p>Loading board...</p>
+          </div>
+        </PageContent>
+      </>
     );
   }
 
+  // Error state
   if (boardError) {
     return (
-      <div className="boards-layout boards-layout--empty">
-        <p className="boards-empty-message">{boardError}</p>
-      </div>
+      <>
+        <PageHeader title="Error" kicker="Board" />
+        <PageContent>
+          <div className="board-error">
+            <p>{boardError}</p>
+            <Button variant="primary" onClick={() => navigate('/user/boards')}>
+              Back to Boards
+            </Button>
+          </div>
+        </PageContent>
+      </>
+    );
+  }
+
+  // Auth required
+  if (!authToken) {
+    return (
+      <>
+        <PageHeader title="Please log in" kicker="Board" />
+        <PageContent>
+          <div className="board-error">
+            <p>Please log in to view this board.</p>
+          </div>
+        </PageContent>
+      </>
     );
   }
 
   return (
-    <div className="boards-layout">
-      <aside className="boards-sidebar" aria-label="Sidebar">
-        <div className="sidebar-header">
-          <button type="button" className="sidebar-logo" aria-label="Workspace">
-            <Icon name="workspace" size={18} />
-          </button>
-          <div className="sidebar-title">Inbox</div>
+    <div className="board-page">
+      {/* Board Header */}
+      <header className="board-header">
+        <div className="board-header__left">
+          <Button variant="ghost" size="sm" onClick={() => navigate('/user/boards')}>
+            <Icons.ArrowLeft /> All boards
+          </Button>
         </div>
-        <div className="sidebar-add">
-          <button type="button" className="sidebar-add-btn">+ Add a card</button>
+        <div className="board-header__center">
+          <h1
+            className="board-header__title"
+            contentEditable
+            suppressContentEditableWarning
+            onBlur={(e) => setTitle(e.currentTarget.textContent || 'My Board')}
+          >
+            {title}
+          </h1>
         </div>
-        <div className="sidebar-section">
-          <div className="sidebar-section-title">Group your tasks</div>
-          <p className="sidebar-section-text">
-            Have an idea? Email it, forward it — however it pops up
-          </p>
-          <div className="sidebar-icons">
-            <button className="sidebar-icon" type="button" aria-label="Mail">
-              <Icon name="mail" size={18} />
-            </button>
-            <button className="sidebar-icon" type="button" aria-label="Web clipper">
-              <Icon name="globe" size={18} />
-            </button>
-            <button className="sidebar-icon" type="button" aria-label="Add integration">
-              <Icon name="plus" size={18} />
-            </button>
-          </div>
-          <div className="sidebar-privacy">A 100% private inbox</div>
+        <div className="board-header__right">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsStarred(!isStarred)}
+            className={isStarred ? 'starred' : ''}
+          >
+            <Icons.Star filled={isStarred} />
+          </Button>
+          <Button variant="ghost" size="icon">
+            <Icons.MoreHorizontal />
+          </Button>
+          <Button variant="primary" size="sm">Share</Button>
         </div>
-      </aside>
+      </header>
 
-      <section className="boards-main">
-        <div className="board-nav-row">
-          <button type="button" className="ghost-button board-back-btn" onClick={() => navigate('/user/boards')}>
-            ← All boards
-          </button>
-        </div>
-        <header className="board-header">
-          <div className="board-title-row">
-            <h1 className="board-title" dir="ltr" contentEditable suppressContentEditableWarning onBlur={(e)=>setTitle(e.currentTarget.textContent || 'My Trello board')}>{title}</h1>
-            <div className="board-actions">
-              <button type="button" className="board-action" aria-label="Board options">⋯</button>
-              <button type="button" className="board-action" aria-label="Star board">
-                <Icon name="star" size={16} />
-              </button>
-              <button type="button" className="board-share">Share</button>
-            </div>
-          </div>
-        </header>
-
+      {/* Board Content */}
+      <div className="board-content">
         <DragDropContext onDragEnd={handleDragEnd}>
           <Droppable droppableId="board" direction="horizontal" type="COLUMN">
             {(boardProvided) => (
               <div
-                className="lists-wrapper"
-                role="list"
-                aria-label="Board lists"
+                className="board-columns"
                 ref={boardProvided.innerRef}
                 {...boardProvided.droppableProps}
               >
                 {columns.map((col, colIndex) => {
-                  const colOverrideHex = overridesByColumn[col.id] ? normHex(overridesByColumn[col.id]) : null;
-                  const headerStyle = colOverrideHex ? { backgroundColor: colOverrideHex, color: textOn(colOverrideHex) } : undefined;
-                  const listClass = colOverrideHex ? 'list' : `list list--${col.accent}`;
+                  const accentStyle = ACCENT_COLORS[col.accent] || ACCENT_COLORS.primary;
+
                   return (
                     <Draggable draggableId={col.id} index={colIndex} key={col.id}>
                       {(colProvided) => (
-                        <article
-                          className={listClass}
+                        <div
+                          className="board-column"
                           ref={colProvided.innerRef}
-                          role="listitem"
                           {...colProvided.draggableProps}
                           style={colProvided.draggableProps.style}
                         >
-                          <header className="list-header" style={{ cursor: 'grab', ...headerStyle }} {...colProvided.dragHandleProps}>
-                            <div className="list-title">
-                              <span className="list-title-text">{col.title}</span>
-                              <span className="list-count">{col.cards.length}</span>
-                            </div>
-                            <div className="list-actions">
-                              <button className="list-action" type="button" aria-label="More" onClick={() => setOpenMenuFor(col.id)}>⋯</button>
-                            </div>
-                          </header>
+                          {/* Column Header */}
+                          <div
+                            className="column-header"
+                            {...colProvided.dragHandleProps}
+                          >
+                            <div
+                              className="column-header__dot"
+                              style={{ background: accentStyle.border }}
+                            />
+                            <span className="column-header__title">{col.title}</span>
+                            <span className="column-header__count">{col.cards.length}</span>
+                            <button className="column-header__more">
+                              <Icons.MoreHorizontal />
+                            </button>
+                          </div>
+
+                          {/* Cards */}
                           <Droppable droppableId={col.id} type="CARD">
                             {(listProvided) => (
-                              <div className="list-cards" ref={listProvided.innerRef} {...listProvided.droppableProps}>
-                                {col.cards.map((card, cardIndex) => {
-                                  const tokenHex = COLOR_MAP[card.color] || null;
-                                  const columnTokenHex = COLOR_MAP[col.accent] || null;
-                                  const finalHex = colOverrideHex || tokenHex || columnTokenHex || COLOR_MAP.primary;
-                                  const badgeStyle = { backgroundColor: rgba(finalHex, 0.18), color: finalHex };
-                                  return (
-                                    <Draggable key={card.id} draggableId={String(card.id)} index={cardIndex}>
-                                      {(cardProvided) => (
-                                        <div
-                                          className="tcard"
-                                          ref={cardProvided.innerRef}
-                                          {...cardProvided.draggableProps}
-                                          style={cardProvided.draggableProps.style}
-                                        >
-                                          <div className="tcard-head" {...cardProvided.dragHandleProps}>
-                                            <div className="tcard-badges">
-                                              <span className={`tbadge tbadge--${card.color}`} style={badgeStyle}>{card.badge}</span>
-                                            </div>
-                                            <button
-                                              type="button"
-                                              className="tcard-edit"
-                                              aria-label={`Edit ${card.title}`}
-                                              onClick={(e) => { e.stopPropagation(); openCardEditor(card, col.id); }}
-                                              onMouseDown={(e) => e.stopPropagation()}
-                                              onTouchStart={(e) => e.stopPropagation()}
-                                            >
-                                              <Icon name="edit" size={12} />
-                                            </button>
-                                          </div>
-                                          <div className="tcard-title">{card.title}</div>
-                                          <div className="tcard-meta">
-                                            <span className="tmeta">
-                                              <Icon name="eye" size={14} />
-                                              <span>1</span>
-                                            </span>
-                                            <span className="tmeta">
-                                              <Icon name="document" size={14} />
-                                              <span>0/6</span>
-                                            </span>
-                                          </div>
+                              <div
+                                className="column-cards"
+                                ref={listProvided.innerRef}
+                                {...listProvided.droppableProps}
+                              >
+                                {col.cards.map((card, cardIndex) => (
+                                  <Draggable
+                                    key={card.id}
+                                    draggableId={String(card.id)}
+                                    index={cardIndex}
+                                  >
+                                    {(cardProvided, snapshot) => (
+                                      <div
+                                        className={`board-card ${snapshot.isDragging ? 'board-card--dragging' : ''}`}
+                                        ref={cardProvided.innerRef}
+                                        {...cardProvided.draggableProps}
+                                        {...cardProvided.dragHandleProps}
+                                        style={cardProvided.draggableProps.style}
+                                      >
+                                        <div className="board-card__header">
+                                          <Badge
+                                            variant={card.color || col.accent}
+                                            size="sm"
+                                          >
+                                            {card.badge || col.title}
+                                          </Badge>
+                                          <button
+                                            className="board-card__edit"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              openCardEditor(card, col.id);
+                                            }}
+                                          >
+                                            <Icons.Edit />
+                                          </button>
                                         </div>
-                                      )}
-                                    </Draggable>
-                                  );
-                                })}
+                                        <p className="board-card__title">{card.title}</p>
+                                        <div className="board-card__footer">
+                                          <span className="board-card__meta">
+                                            <Icons.Eye />
+                                            <span>1</span>
+                                          </span>
+                                          <span className="board-card__meta">
+                                            <Icons.CheckSquare />
+                                            <span>0/6</span>
+                                          </span>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </Draggable>
+                                ))}
                                 {listProvided.placeholder}
+
+                                {/* Card Composer */}
                                 {composerFor === col.id ? (
                                   <CardComposer
-                                    onAdd={(value) => handleAddCardSubmit(col, value)}
+                                    onAdd={(title) => handleAddCard(col, title)}
                                     onCancel={closeComposer}
                                     error={composerError}
                                   />
                                 ) : (
-                                  <button type="button" className="tadd-card" onClick={() => openComposer(col.id)}>+ Add a card</button>
+                                  <button
+                                    className="add-card-btn"
+                                    onClick={() => openComposer(col.id)}
+                                  >
+                                    <Icons.Plus />
+                                    <span>Add a card</span>
+                                  </button>
                                 )}
                               </div>
                             )}
                           </Droppable>
-                          {openMenuFor === col.id && (
-                            <ListColorMenu
-                              column={col}
-                              presetMap={COLOR_MAP}
-                              onClose={() => setOpenMenuFor(null)}
-                              onSelectColor={(hexOrToken) => {
-                                const o = loadOverrides();
-                                if (isHex(hexOrToken)) {
-                                  o[col.id] = normHex(hexOrToken);
-                                } else if (hexOrToken in COLOR_MAP) {
-                                  o[col.id] = COLOR_MAP[hexOrToken];
-                                }
-                                saveOverrides(o);
-                                setColumns([...columns]);
-                                setOpenMenuFor(null);
-                              }}
-                            />
-                          )}
-                        </article>
+                        </div>
                       )}
                     </Draggable>
                   );
                 })}
                 {boardProvided.placeholder}
-                <button type="button" className="list list--adder">+ Add a list</button>
+
+                {/* Add List Button */}
+                <button className="add-list-btn">
+                  <Icons.Plus />
+                  <span>Add a list</span>
+                </button>
               </div>
             )}
           </Droppable>
         </DragDropContext>
+      </div>
 
-        <div className="boards-toolbar" role="toolbar" aria-label="Board toolbar">
-          <button type="button" className="toolbar-btn toolbar-btn--active">Inbox</button>
-          <button type="button" className="toolbar-btn">Calendar</button>
-          <button type="button" className="toolbar-btn">Board</button>
-          <button type="button" className="toolbar-btn">Switch board</button>
-        </div>
-
-        <BoardTemplatesModal
-          open={showTemplates}
-          onClose={() => setShowTemplates(false)}
-          onSelect={(tpl) => {
-            setColumns(ensureIds(tpl.columns));
-            setShowTemplates(false);
-          }}
+      {/* Card Edit Modal */}
+      {editingCard && (
+        <CardEditModal
+          title={editingTitle}
+          onChange={setEditingTitle}
+          onSave={handleEditCardSave}
+          onClose={closeCardEditor}
+          saving={editingSaving}
+          error={editingError}
         />
-        {editingCard && (
-          <CardEditModal
-            title={editingTitle}
-            onChange={setEditingTitle}
-            onSave={handleEditCardSave}
-            onClose={closeCardEditor}
-            saving={editingSaving}
-            error={editingError}
-          />
-        )}
-      </section>
+      )}
+    </div>
+  );
+}
+
+// ============ Card Composer ============
+function CardComposer({ onAdd, onCancel, error }) {
+  const inputRef = useRef(null);
+  const [value, setValue] = useState('');
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const handleSubmit = async () => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    try {
+      await onAdd?.(trimmed);
+      setValue('');
+    } catch {
+      // Error handled by parent
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      onCancel?.();
+    }
+  };
+
+  return (
+    <div className="card-composer">
+      <textarea
+        ref={inputRef}
+        className="card-composer__input"
+        placeholder="Enter a title for this card..."
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        rows={3}
+      />
+      <div className="card-composer__actions">
+        <Button variant="primary" size="sm" onClick={handleSubmit}>
+          Add card
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
+      {error && <div className="card-composer__error">{error}</div>}
+    </div>
+  );
+}
+
+// ============ Card Edit Modal ============
+function CardEditModal({ title, onChange, onSave, onClose, saving, error }) {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) {
+        onClose?.();
+      }
+    };
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') onClose?.();
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [onClose]);
+
+  return (
+    <div className="card-modal-overlay">
+      <div className="card-modal" ref={ref}>
+        <div className="card-modal__header">
+          <h3>Edit card</h3>
+          <button className="card-modal__close" onClick={onClose}>
+            <Icons.X />
+          </button>
+        </div>
+        <textarea
+          className="card-modal__input"
+          value={title}
+          onChange={(e) => onChange?.(e.target.value)}
+          rows={4}
+          autoFocus
+        />
+        {error && <div className="card-modal__error">{error}</div>}
+        <div className="card-modal__actions">
+          <Button variant="primary" onClick={onSave} disabled={saving} loading={saving}>
+            Save
+          </Button>
+          <Button variant="ghost" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
