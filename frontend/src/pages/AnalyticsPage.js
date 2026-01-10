@@ -3,6 +3,7 @@ import { PageHeader, PageContent } from '../components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { ProgressCircle } from '../components/ui/ProgressCircle';
+import { BoardIcon, ListIcon, CheckCircleIcon, TargetIcon, RocketIcon, LightbulbIcon, ClockIcon } from '../components/ui/Icons';
 import { api } from '../services/api';
 import './AnalyticsPage.css';
 
@@ -139,7 +140,9 @@ function AnalyticsPage({ authToken }) {
                         <section className="analytics-stats">
                             <Card className="stat-card stat-card--primary">
                                 <CardContent>
-                                    <div className="stat-card__icon">📋</div>
+                                    <div className="stat-card__icon">
+                                        <BoardIcon size={28} />
+                                    </div>
                                     <div className="stat-card__content">
                                         <span className="stat-card__value">{stats.totalBoards}</span>
                                         <span className="stat-card__label">Total Boards</span>
@@ -149,7 +152,9 @@ function AnalyticsPage({ authToken }) {
 
                             <Card className="stat-card stat-card--accent">
                                 <CardContent>
-                                    <div className="stat-card__icon">📝</div>
+                                    <div className="stat-card__icon">
+                                        <ListIcon size={28} />
+                                    </div>
                                     <div className="stat-card__content">
                                         <span className="stat-card__value">{stats.totalLists}</span>
                                         <span className="stat-card__label">Total Lists</span>
@@ -159,7 +164,9 @@ function AnalyticsPage({ authToken }) {
 
                             <Card className="stat-card stat-card--success">
                                 <CardContent>
-                                    <div className="stat-card__icon">✅</div>
+                                    <div className="stat-card__icon">
+                                        <CheckCircleIcon size={28} />
+                                    </div>
                                     <div className="stat-card__content">
                                         <span className="stat-card__value">{stats.totalCards}</span>
                                         <span className="stat-card__label">Total Cards</span>
@@ -169,7 +176,9 @@ function AnalyticsPage({ authToken }) {
 
                             <Card className="stat-card stat-card--warning">
                                 <CardContent>
-                                    <div className="stat-card__icon">🎯</div>
+                                    <div className="stat-card__icon">
+                                        <TargetIcon size={28} />
+                                    </div>
                                     <div className="stat-card__content">
                                         <span className="stat-card__value">{stats.averageProgress}%</span>
                                         <span className="stat-card__label">Completion Rate</span>
@@ -259,21 +268,27 @@ function AnalyticsPage({ authToken }) {
                                 <CardContent>
                                     <div className="insights-list">
                                         <div className="insight-item insight-item--success">
-                                            <span className="insight-item__icon">🚀</span>
+                                            <span className="insight-item__icon">
+                                                <RocketIcon size={24} />
+                                            </span>
                                             <div className="insight-item__content">
                                                 <strong>Great momentum!</strong>
                                                 <p>You've completed {stats.completedCards} tasks. Keep it up!</p>
                                             </div>
                                         </div>
                                         <div className="insight-item insight-item--info">
-                                            <span className="insight-item__icon">💡</span>
+                                            <span className="insight-item__icon">
+                                                <LightbulbIcon size={24} />
+                                            </span>
                                             <div className="insight-item__content">
                                                 <strong>Pro tip</strong>
                                                 <p>Break down large cards into smaller, actionable tasks for better tracking.</p>
                                             </div>
                                         </div>
                                         <div className="insight-item insight-item--warning">
-                                            <span className="insight-item__icon">⏰</span>
+                                            <span className="insight-item__icon">
+                                                <ClockIcon size={24} />
+                                            </span>
                                             <div className="insight-item__content">
                                                 <strong>Stay on track</strong>
                                                 <p>Review your boards weekly to ensure nothing falls through the cracks.</p>
