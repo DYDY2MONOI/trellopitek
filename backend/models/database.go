@@ -47,7 +47,6 @@ func InitDB() (*sql.DB, error) {
         return nil, err
     }
 
-    // Boards owned by users
     createBoardsTableSQL := `
     CREATE TABLE IF NOT EXISTS boards (
         id SERIAL PRIMARY KEY,
@@ -63,7 +62,6 @@ func InitDB() (*sql.DB, error) {
         return nil, err
     }
 
-    // Lists inside boards
     createListsTableSQL := `
     CREATE TABLE IF NOT EXISTS lists (
         id SERIAL PRIMARY KEY,
@@ -81,7 +79,6 @@ func InitDB() (*sql.DB, error) {
         return nil, err
     }
 
-    // Cards inside lists
     createCardsTableSQL := `
     CREATE TABLE IF NOT EXISTS cards (
         id SERIAL PRIMARY KEY,
