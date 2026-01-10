@@ -1,0 +1,166 @@
+/* ============ Input Component ============ */
+.input {
+    display: flex;
+    width: 100%;
+    border-radius: var(--radius);
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--card));
+    color: hsl(var(--foreground));
+    font-size: 0.875rem;
+    transition: all var(--transition);
+}
+
+.input::placeholder {
+    color: hsl(var(--muted-foreground));
+}
+
+.input:focus {
+    outline: none;
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
+}
+
+.input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: hsl(var(--muted));
+}
+
+/* Sizes */
+.input--default {
+    height: 2.5rem;
+    padding: 0 0.75rem;
+}
+
+.input--sm {
+    height: 2rem;
+    padding: 0 0.625rem;
+    font-size: 0.8125rem;
+}
+
+.input--lg {
+    height: 3rem;
+    padding: 0 1rem;
+    font-size: 1rem;
+}
+
+/* Error State */
+.input--error {
+    border-color: hsl(var(--destructive));
+}
+
+.input--error:focus {
+    box-shadow: 0 0 0 3px hsl(var(--destructive) / 0.1);
+}
+
+/* Input Wrapper (for icons) */
+.input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.input-wrapper .input--in-wrapper {
+    width: 100%;
+    border-radius: var(--radius);
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--card));
+    color: hsl(var(--foreground));
+    font-size: 0.875rem;
+    transition: all var(--transition);
+}
+
+.input-wrapper--default .input--in-wrapper {
+    height: 2.5rem;
+    padding: 0 0.75rem;
+}
+
+.input-wrapper--sm .input--in-wrapper {
+    height: 2rem;
+    padding: 0 0.625rem;
+    font-size: 0.8125rem;
+}
+
+.input-wrapper--lg .input--in-wrapper {
+    height: 3rem;
+    padding: 0 1rem;
+    font-size: 1rem;
+}
+
+.input-wrapper__icon {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: hsl(var(--muted-foreground));
+    pointer-events: none;
+}
+
+.input-wrapper__icon--left {
+    left: 0.75rem;
+}
+
+.input-wrapper__icon--right {
+    right: 0.75rem;
+}
+
+.input-wrapper__icon--left+.input--in-wrapper,
+.input-wrapper .input--in-wrapper:has(+ .input-wrapper__icon--left) {
+    padding-left: 2.5rem;
+}
+
+.input-wrapper:has(.input-wrapper__icon--left) .input--in-wrapper {
+    padding-left: 2.5rem;
+}
+
+.input-wrapper:has(.input-wrapper__icon--right) .input--in-wrapper {
+    padding-right: 2.5rem;
+}
+
+.input-wrapper .input--in-wrapper:focus {
+    outline: none;
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
+}
+
+/* Error Wrapper */
+.input-wrapper--error .input--in-wrapper {
+    border-color: hsl(var(--destructive));
+}
+
+/* Textarea */
+.textarea {
+    display: flex;
+    width: 100%;
+    min-height: 5rem;
+    border-radius: var(--radius);
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--card));
+    color: hsl(var(--foreground));
+    padding: 0.75rem;
+    font-size: 0.875rem;
+    font-family: inherit;
+    line-height: 1.5;
+    resize: vertical;
+    transition: all var(--transition);
+}
+
+.textarea::placeholder {
+    color: hsl(var(--muted-foreground));
+}
+
+.textarea:focus {
+    outline: none;
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
+}
+
+.textarea--error {
+    border-color: hsl(var(--destructive));
+}
+
+/* Search Input */
+.search-input {
+    background: hsl(var(--muted) / 0.5);
+}
