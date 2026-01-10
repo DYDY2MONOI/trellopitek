@@ -69,7 +69,14 @@
 }
 
 .settings-nav__icon {
-    font-size: 1.125rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.settings-nav__icon svg {
+    width: 18px;
+    height: 18px;
 }
 
 .settings-nav__label {
@@ -176,7 +183,15 @@
 }
 
 .theme-option__icon {
-    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--foreground);
+}
+
+.theme-option__icon svg {
+    width: 24px;
+    height: 24px;
 }
 
 .theme-option__label {
@@ -362,7 +377,15 @@
 }
 
 .session-item__icon {
-    font-size: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+}
+
+.session-item__icon svg {
+    width: 20px;
+    height: 20px;
 }
 
 .session-item__info strong {

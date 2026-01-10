@@ -469,9 +469,9 @@ function BoardsIndexPage({ authToken, boards, setBoards }) {
   }, [authToken, setBoards]);
 
   const templates = [
-    { title: 'Kanban', desc: 'Ideas → Doing → Done', gradient: 'linear-gradient(135deg, #a855f7, #3b82f6)' },
-    { title: 'Sprint Planning', desc: 'Backlog → Sprint → QA', gradient: 'linear-gradient(135deg, #34d399, #0ea5e9)' },
-    { title: 'Bug Triage', desc: 'New → Investigating → Fixing', gradient: 'linear-gradient(135deg, #f97316, #facc15)' },
+    { title: 'Kanban', desc: 'Ideas → Doing → Done', colorClass: 'template-card--purple' },
+    { title: 'Sprint Planning', desc: 'Backlog → Sprint → QA', colorClass: 'template-card--teal' },
+    { title: 'Bug Triage', desc: 'New → Investigating → Fixing', colorClass: 'template-card--orange' },
   ];
 
   if (!authToken) {
@@ -565,8 +565,7 @@ function BoardsIndexPage({ authToken, boards, setBoards }) {
                 {templates.map((tpl) => (
                   <div
                     key={tpl.title}
-                    className="template-card"
-                    style={{ background: tpl.gradient }}
+                    className={`template-card ${tpl.colorClass}`}
                   >
                     <div className="template-card__content">
                       <h4>{tpl.title}</h4>
@@ -613,10 +612,10 @@ function TemplatesGalleryPage({ authToken }) {
   };
 
   const templates = [
-    { title: 'Kanban', desc: 'Ideas → Doing → Review → Done', gradient: 'linear-gradient(135deg, #a855f7, #3b82f6)' },
-    { title: 'Sprint Planning', desc: 'Backlog → Sprint → QA → Retro', gradient: 'linear-gradient(135deg, #34d399, #3b82f6)' },
-    { title: 'Bug Triage', desc: 'New → Investigating → Fixing → Release', gradient: 'linear-gradient(135deg, #f97316, #facc15)' },
-    { title: 'Personal Tasks', desc: 'Today → This week → Someday', gradient: 'linear-gradient(135deg, #22c55e, #14b8a6)' },
+    { title: 'Kanban', desc: 'Ideas → Doing → Review → Done', colorClass: 'template-card--purple' },
+    { title: 'Sprint Planning', desc: 'Backlog → Sprint → QA → Retro', colorClass: 'template-card--teal' },
+    { title: 'Bug Triage', desc: 'New → Investigating → Fixing → Release', colorClass: 'template-card--orange' },
+    { title: 'Personal Tasks', desc: 'Today → This week → Someday', colorClass: 'template-card--cyan' },
   ];
 
   return (
@@ -638,8 +637,7 @@ function TemplatesGalleryPage({ authToken }) {
           {templates.map((tpl) => (
             <div
               key={tpl.title}
-              className="template-gallery-card"
-              style={{ background: tpl.gradient }}
+              className={`template-gallery-card ${tpl.colorClass}`}
             >
               <div className="template-gallery-card__content">
                 <h3>{tpl.title}</h3>
