@@ -87,15 +87,12 @@ const Icons = {
 
 // Navigation items
 const navItems = [
-    { id: 'inbox', label: 'Inbox', icon: Icons.Inbox, badge: 3 },
-    { id: 'my-tasks', label: 'My Tasks', icon: Icons.CheckSquare, badge: null },
     { id: 'boards', label: 'Boards', icon: Icons.Folder, path: '/user/boards' },
-    { id: 'members', label: 'Members', icon: Icons.Users, badge: null },
-    { id: 'analytics', label: 'Analytics', icon: Icons.ChartBar, badge: null },
+    { id: 'analytics', label: 'Analytics', icon: Icons.ChartBar, path: '/user/analytics' },
 ];
 
 const footerItems = [
-    { id: 'settings', label: 'Settings', icon: Icons.Settings },
+    { id: 'settings', label: 'Settings', icon: Icons.Settings, path: '/user/settings' },
     { id: 'templates', label: 'Templates', icon: Icons.Layout, path: '/user/boards/templates' },
     { id: 'help', label: 'Help & Support', icon: Icons.Help },
 ];
