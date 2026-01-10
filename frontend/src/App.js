@@ -16,6 +16,8 @@ import { Avatar, AvatarGroup } from './components/ui/Avatar';
 
 // Pages
 import BoardsPage from './pages/BoardsPage';
+import AnalyticsPage from './pages/AnalyticsPage';
+import SettingsPage from './pages/SettingsPage';
 
 // Services
 import { getAuthToken, setAuthToken, api } from './services/api';
@@ -215,6 +217,21 @@ function App() {
             path="/user/boards/templates"
             element={
               <TemplatesGalleryPage authToken={authTokenState} />
+            }
+          />
+          <Route
+            path="/user/analytics"
+            element={<AnalyticsPage authToken={authTokenState} />}
+          />
+          <Route
+            path="/user/settings"
+            element={
+              <SettingsPage
+                user={user}
+                theme={theme}
+                onToggleTheme={toggleTheme}
+                onLogout={handleLogout}
+              />
             }
           />
           <Route path="*" element={<Navigate to="/user/boards" replace />} />
