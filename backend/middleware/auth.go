@@ -22,7 +22,6 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Extract token from "Bearer <token>"
 		parts := strings.Split(authHeader, " ")
 		if len(parts) != 2 || parts[0] != "Bearer" {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -32,7 +31,6 @@ func AuthMiddleware(next http.Handler) http.Handler {
 
 		tokenString := parts[1]
 
-		// Parse and validate token
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, jwt.ErrSignatureInvalid
@@ -46,7 +44,6 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Extract user ID from claims
 		claims, ok := token.Claims.(jwt.MapClaims)
 		if !ok {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -61,7 +58,6 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Add user ID to context
 		ctx := context.WithValue(r.Context(), "userID", int(userID))
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
