@@ -1,4 +1,3 @@
-// SVG Logo Components for companies
 export const VisaLogo = () => (
   <svg width="180" height="60" viewBox="0 0 200 60" fill="none" xmlns="http://www.w3.org/2000/svg">
     <rect width="200" height="60" fill="white" rx="4"/>
