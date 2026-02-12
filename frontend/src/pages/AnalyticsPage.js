@@ -13,6 +13,7 @@ import './AnalyticsPage.css';
 function AnalyticsPage({ authToken }) {
     const [boards, setBoards] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [boardProgressData, setBoardProgressData] = useState([]);
     const [stats, setStats] = useState({
         totalBoards: 0,
         totalLists: 0,
@@ -34,6 +35,7 @@ function AnalyticsPage({ authToken }) {
                     setBoards(data || []);
 
                     // Calculate stats
+                    let perBoardProgress = [];
                     let totalLists = 0;
                     let totalCards = 0;
                     let completedCards = 0;
@@ -48,15 +50,26 @@ function AnalyticsPage({ authToken }) {
                     boardDetails.forEach(board => {
                         if (board && board.lists) {
                             totalLists += board.lists.length;
+                            let boardCards = 0;
+                            let boardDone = 0;
                             board.lists.forEach(list => {
                                 if (list.cards) {
                                     totalCards += list.cards.length;
+                                    boardCards += list.cards.length;
                                     // Count cards in "Done" or "Completed" lists as completed
                                     if (list.title.toLowerCase().includes('done') ||
                                         list.title.toLowerCase().includes('complete')) {
                                         completedCards += list.cards.length;
+                                        boardDone += list.cards.length;
                                     }
                                 }
+                            });
+                            // Store per-board progress
+                            const progress = boardCards > 0 ? Math.round((boardDone / boardCards) * 100) : 0;
+                            perBoardProgress.push({
+                                id: board.id || board.ID,
+                                name: board.title,
+                                progress,
                             });
                         }
                     });
@@ -65,6 +78,7 @@ function AnalyticsPage({ authToken }) {
                         ? Math.round((completedCards / totalCards) * 100)
                         : 0;
 
+                    setBoardProgressData(perBoardProgress);
                     setStats({
                         totalBoards: data?.length || 0,
                         totalLists,
@@ -83,24 +97,9 @@ function AnalyticsPage({ authToken }) {
         return () => { cancelled = true; };
     }, [authToken]);
 
-    // Simulated activity data for the chart
-    const activityData = [
-        { day: 'Mon', tasks: 12 },
-        { day: 'Tue', tasks: 19 },
-        { day: 'Wed', tasks: 8 },
-        { day: 'Thu', tasks: 15 },
-        { day: 'Fri', tasks: 22 },
-        { day: 'Sat', tasks: 6 },
-        { day: 'Sun', tasks: 4 },
-    ];
-
-    const maxActivity = Math.max(...activityData.map(d => d.tasks));
-
-    // Board progress data
-    const boardProgress = boards.slice(0, 5).map((board, idx) => ({
-        id: board.id,
-        name: board.title,
-        progress: Math.floor(Math.random() * 100), // Simulated
+    // Board progress data from real computed values
+    const boardProgress = boardProgressData.slice(0, 5).map((board, idx) => ({
+        ...board,
         color: ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'][idx % 5],
     }));
 
@@ -196,22 +195,10 @@ function AnalyticsPage({ authToken }) {
                                     <CardDescription>Tasks completed per day this week</CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="activity-chart">
-                                        {activityData.map((data) => (
-                                            <div key={data.day} className="activity-bar-container">
-                                                <div className="activity-bar-wrapper">
-                                                    <div
-                                                        className="activity-bar"
-                                                        style={{
-                                                            height: `${Math.max((data.tasks / maxActivity) * 100, 15)}%`,
-                                                        }}
-                                                    >
-                                                        <span className="activity-bar__value">{data.tasks}</span>
-                                                    </div>
-                                                </div>
-                                                <span className="activity-bar__label">{data.day}</span>
-                                            </div>
-                                        ))}
+                                    <div className="analytics-coming-soon">
+                                        <ClockIcon size={32} />
+                                        <p>Activity tracking coming soon</p>
+                                        <span>We're working on capturing your daily task completions to show trends here.</span>
                                     </div>
                                 </CardContent>
                             </Card>
