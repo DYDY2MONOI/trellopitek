@@ -97,6 +97,41 @@ func InitDB() (*sql.DB, error) {
         return nil, err
     }
 
+    // Add description column if it doesn't exist
+    _, _ = db.Exec(`ALTER TABLE cards ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''`)
+
+    createCardTagsTableSQL := `
+    CREATE TABLE IF NOT EXISTS card_tags (
+        id SERIAL PRIMARY KEY,
+        card_id INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        color TEXT NOT NULL DEFAULT 'primary',
+        UNIQUE(card_id, name)
+    );
+    CREATE INDEX IF NOT EXISTS idx_card_tags_card_id ON card_tags(card_id);
+    `
+
+    _, err = db.Exec(createCardTagsTableSQL)
+    if err != nil {
+        return nil, err
+    }
+
+    createCardCommentsTableSQL := `
+    CREATE TABLE IF NOT EXISTS card_comments (
+        id SERIAL PRIMARY KEY,
+        card_id INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_card_comments_card_id ON card_comments(card_id);
+    `
+
+    _, err = db.Exec(createCardCommentsTableSQL)
+    if err != nil {
+        return nil, err
+    }
+
     createBoardMembersTableSQL := `
     CREATE TABLE IF NOT EXISTS board_members (
         id SERIAL PRIMARY KEY,
