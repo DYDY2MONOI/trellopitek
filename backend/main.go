@@ -34,6 +34,10 @@ func main() {
 	protected.HandleFunc("/boards", boardHandler.ListBoards).Methods("GET")
 	protected.HandleFunc("/boards", boardHandler.CreateBoard).Methods("POST")
 	protected.HandleFunc("/boards/{id}", boardHandler.GetBoard).Methods("GET")
+	protected.HandleFunc("/boards/{id}/members", boardHandler.GetBoardMembers).Methods("GET")
+	protected.HandleFunc("/boards/{id}/members", boardHandler.InviteMember).Methods("POST")
+	protected.HandleFunc("/boards/{id}/members/{userId}", boardHandler.RemoveMember).Methods("DELETE")
+	protected.HandleFunc("/users/search", boardHandler.SearchUsers).Methods("GET")
 	protected.HandleFunc("/lists/{id}/cards", boardHandler.CreateCard).Methods("POST")
 	protected.HandleFunc("/cards/{id}", boardHandler.UpdateCard).Methods("PATCH", "PUT")
 
