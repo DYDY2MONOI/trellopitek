@@ -120,6 +120,50 @@ export const api = {
     }
     return response.json();
   },
+
+  async getBoardMembers(boardId, token) {
+    const response = await fetch(`${API_URL}/boards/${boardId}/members`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Failed to fetch board members');
+    return response.json();
+  },
+
+  async inviteMember(boardId, email, token) {
+    const response = await fetch(`${API_URL}/boards/${boardId}/members`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ email }),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({ error: 'Failed to invite member' }));
+      throw new Error(data.error || 'Failed to invite member');
+    }
+    return response.json();
+  },
+
+  async removeMember(boardId, userId, token) {
+    const response = await fetch(`${API_URL}/boards/${boardId}/members/${userId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({ error: 'Failed to remove member' }));
+      throw new Error(data.error || 'Failed to remove member');
+    }
+    return response.json();
+  },
+
+  async searchUsers(query, token) {
+    const response = await fetch(`${API_URL}/users/search?q=${encodeURIComponent(query)}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Failed to search users');
+    return response.json();
+  },
 };
 
 export const setAuthToken = (token) => {
