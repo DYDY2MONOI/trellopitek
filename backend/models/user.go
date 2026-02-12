@@ -56,3 +56,24 @@ func (us *UserService) GetUserByID(id int) (*User, error) {
 
 	return &user, nil
 }
+
+func (us *UserService) SearchUsersByEmail(query string, excludeUserID int) ([]User, error) {
+	rows, err := us.DB.Query(
+		"SELECT id, email, created_at FROM users WHERE email ILIKE $1 AND id != $2 ORDER BY email LIMIT 10",
+		"%"+query+"%", excludeUserID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []User
+	for rows.Next() {
+		var u User
+		if err := rows.Scan(&u.ID, &u.Email, &u.CreatedAt); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
