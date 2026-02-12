@@ -9,6 +9,15 @@ import { PageHeader, PageContent } from '../components/layout/MainLayout';
 import './BoardsPage.css';
 
 // Icons
+// Preset tags
+const PRESET_TAGS = [
+  { name: 'Bug', color: 'destructive' },
+  { name: 'Feature', color: 'primary' },
+  { name: 'Enhancement', color: 'accent' },
+  { name: 'Urgent', color: 'warning' },
+  { name: 'Documentation', color: 'success' },
+];
+
 const Icons = {
   Star: ({ filled }) => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
@@ -94,8 +103,10 @@ function ensureIds(cols) {
       cards: (c.cards || []).map((card, i) => ({
         id: String(card.id ?? `${c.title}-${i}`),
         title: card.title,
+        description: card.description || '',
         badge: card.badge,
         color: card.color || 'primary',
+        tags: card.tags || [],
       })),
     };
   });
@@ -155,8 +166,12 @@ export default function BoardsPage({ authToken, user }) {
   const [composerError, setComposerError] = useState(null);
   const [editingCard, setEditingCard] = useState(null);
   const [editingTitle, setEditingTitle] = useState('');
+  const [editingDescription, setEditingDescription] = useState('');
+  const [editingTags, setEditingTags] = useState([]);
+  const [editingComments, setEditingComments] = useState([]);
   const [editingError, setEditingError] = useState('');
   const [editingSaving, setEditingSaving] = useState(false);
+  const [editingLoading, setEditingLoading] = useState(false);
   const [boardLoading, setBoardLoading] = useState(true);
   const [boardError, setBoardError] = useState(null);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -185,8 +200,10 @@ export default function BoardsPage({ authToken, user }) {
           cards: (l.cards || []).map((c) => ({
             id: String(c.id),
             title: c.title,
+            description: c.description || '',
             badge: c.badge,
             color: c.color || 'primary',
+            tags: c.tags || [],
           })),
         })));
         setColumns(mapped);
@@ -292,17 +309,35 @@ export default function BoardsPage({ authToken, user }) {
   };
 
   // Card editor handlers
-  const openCardEditor = (card, columnId) => {
+  const openCardEditor = async (card, columnId) => {
     setEditingCard({ cardId: card.id, columnId });
     setEditingTitle(card.title);
+    setEditingDescription(card.description || '');
+    setEditingTags(card.tags || []);
+    setEditingComments([]);
     setEditingError('');
+    setEditingLoading(true);
+
+    if (authToken) {
+      try {
+        const detail = await api.getCard(card.id, authToken);
+        setEditingDescription(detail.description || '');
+        setEditingTags(detail.tags || []);
+        setEditingComments(detail.comments || []);
+      } catch { /* use what we have */ }
+    }
+    setEditingLoading(false);
   };
 
   const closeCardEditor = () => {
     setEditingCard(null);
     setEditingTitle('');
+    setEditingDescription('');
+    setEditingTags([]);
+    setEditingComments([]);
     setEditingError('');
     setEditingSaving(false);
+    setEditingLoading(false);
   };
 
   const handleEditCardSave = async () => {
@@ -316,7 +351,10 @@ export default function BoardsPage({ authToken, user }) {
     if (authToken) {
       try {
         setEditingSaving(true);
-        await api.updateCard(editingCard.cardId, { title: nextTitle }, authToken);
+        await api.updateCard(editingCard.cardId, {
+          title: nextTitle,
+          description: editingDescription,
+        }, authToken);
       } catch (err) {
         setEditingError(err?.message || 'Failed to update card');
         setEditingSaving(false);
@@ -329,13 +367,39 @@ export default function BoardsPage({ authToken, user }) {
       return {
         ...col,
         cards: col.cards.map((card) =>
-          card.id === editingCard.cardId ? { ...card, title: nextTitle } : card
+          card.id === editingCard.cardId
+            ? { ...card, title: nextTitle, description: editingDescription, tags: editingTags }
+            : card
         ),
       };
     }));
 
     setEditingSaving(false);
     closeCardEditor();
+  };
+
+  const handleAddTag = async (name, color) => {
+    if (!editingCard || !authToken) return;
+    try {
+      const tag = await api.addCardTag(editingCard.cardId, { name, color }, authToken);
+      setEditingTags((prev) => [...prev.filter(t => t.name !== name), tag]);
+    } catch { /* ignore */ }
+  };
+
+  const handleRemoveTag = async (tagId) => {
+    if (!editingCard || !authToken) return;
+    try {
+      await api.removeCardTag(editingCard.cardId, tagId, authToken);
+      setEditingTags((prev) => prev.filter(t => t.id !== tagId));
+    } catch { /* ignore */ }
+  };
+
+  const handleAddComment = async (content) => {
+    if (!editingCard || !authToken) return;
+    try {
+      const comment = await api.addCardComment(editingCard.cardId, content, authToken);
+      setEditingComments((prev) => [...prev, comment]);
+    } catch { /* ignore */ }
   };
 
   // Loading state
@@ -516,6 +580,15 @@ export default function BoardsPage({ authToken, user }) {
                                           </button>
                                         </div>
                                         <p className="board-card__title">{card.title}</p>
+                                        {card.tags && card.tags.length > 0 && (
+                                          <div className="board-card__tags">
+                                            {card.tags.map((tag) => (
+                                              <span key={tag.id} className={`board-card__tag board-card__tag--${tag.color}`}>
+                                                {tag.name}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        )}
                                         <div className="board-card__footer">
                                           <span className="board-card__meta">
                                             <Icons.Eye />
@@ -573,11 +646,20 @@ export default function BoardsPage({ authToken, user }) {
       {editingCard && (
         <CardEditModal
           title={editingTitle}
-          onChange={setEditingTitle}
+          description={editingDescription}
+          tags={editingTags}
+          comments={editingComments}
+          loading={editingLoading}
+          onTitleChange={setEditingTitle}
+          onDescriptionChange={setEditingDescription}
+          onAddTag={handleAddTag}
+          onRemoveTag={handleRemoveTag}
+          onAddComment={handleAddComment}
           onSave={handleEditCardSave}
           onClose={closeCardEditor}
           saving={editingSaving}
           error={editingError}
+          user={user}
         />
       )}
 
@@ -657,52 +739,303 @@ function CardComposer({ onAdd, onCancel, error }) {
 }
 
 // ============ Card Edit Modal ============
-function CardEditModal({ title, onChange, onSave, onClose, saving, error }) {
+function CardEditModal({
+  title, description, tags, comments, loading,
+  onTitleChange, onDescriptionChange,
+  onAddTag, onRemoveTag, onAddComment,
+  onSave, onClose, saving, error, user,
+}) {
   const ref = useRef(null);
+  const commentsEndRef = useRef(null);
+  const [customTagName, setCustomTagName] = useState('');
+  const [commentDraft, setCommentDraft] = useState('');
+  const [activeSection, setActiveSection] = useState('details');
 
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) {
-        onClose?.();
-      }
-    };
     const handleEscape = (e) => {
       if (e.key === 'Escape') onClose?.();
     };
-
-    document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
-    };
+    return () => document.removeEventListener('keydown', handleEscape);
   }, [onClose]);
 
+  useEffect(() => {
+    commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [comments]);
+
+  const handleAddCustomTag = () => {
+    const name = customTagName.trim();
+    if (!name) return;
+    onAddTag?.(name, 'primary');
+    setCustomTagName('');
+  };
+
+  const handlePostComment = () => {
+    const content = commentDraft.trim();
+    if (!content) return;
+    onAddComment?.(content);
+    setCommentDraft('');
+  };
+
+  const isTagActive = (tagName) => tags?.some(t => t.name === tagName);
+
+  const formatTime = (dateStr) => {
+    try {
+      const d = new Date(dateStr);
+      const now = new Date();
+      const diffMs = now - d;
+      const diffMins = Math.floor(diffMs / 60000);
+      if (diffMins < 1) return 'just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `${diffHours}h ago`;
+      const diffDays = Math.floor(diffHours / 24);
+      if (diffDays < 7) return `${diffDays}d ago`;
+      return d.toLocaleDateString();
+    } catch { return ''; }
+  };
+
   return (
-    <div className="card-modal-overlay">
+    <div className="card-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}>
       <div className="card-modal" ref={ref}>
+        {/* Header */}
         <div className="card-modal__header">
-          <h3>Edit card</h3>
+          <div className="card-modal__header-left">
+            <div className="card-modal__icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <line x1="9" y1="3" x2="9" y2="21" />
+              </svg>
+            </div>
+            <h3>Edit Card</h3>
+          </div>
           <button className="card-modal__close" onClick={onClose}>
             <Icons.X />
           </button>
         </div>
-        <textarea
-          className="card-modal__input"
-          value={title}
-          onChange={(e) => onChange?.(e.target.value)}
-          rows={4}
-          autoFocus
-        />
-        {error && <div className="card-modal__error">{error}</div>}
-        <div className="card-modal__actions">
-          <Button variant="primary" onClick={onSave} disabled={saving} loading={saving}>
-            Save
-          </Button>
-          <Button variant="ghost" onClick={onClose} disabled={saving}>
-            Cancel
-          </Button>
-        </div>
+
+        {loading ? (
+          <div className="card-modal__loading">
+            <div className="app-loading__spinner" />
+            <p>Loading card details...</p>
+          </div>
+        ) : (
+          <>
+            {/* Tab Navigation */}
+            <div className="card-modal__tabs">
+              <button
+                className={`card-modal__tab ${activeSection === 'details' ? 'card-modal__tab--active' : ''}`}
+                onClick={() => setActiveSection('details')}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+                Details
+              </button>
+              <button
+                className={`card-modal__tab ${activeSection === 'comments' ? 'card-modal__tab--active' : ''}`}
+                onClick={() => setActiveSection('comments')}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                Comments
+                {comments && comments.length > 0 && (
+                  <span className="card-modal__tab-badge">{comments.length}</span>
+                )}
+              </button>
+            </div>
+
+            <div className="card-modal__body">
+              {activeSection === 'details' && (
+                <>
+                  {/* Title Section */}
+                  <div className="card-modal__section">
+                    <label className="card-modal__label">Title</label>
+                    <input
+                      className="card-modal__title-input"
+                      value={title}
+                      onChange={(e) => onTitleChange?.(e.target.value)}
+                      placeholder="Card title..."
+                      autoFocus
+                    />
+                  </div>
+
+                  {/* Tags Section */}
+                  <div className="card-modal__section">
+                    <label className="card-modal__label">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+                        <line x1="7" y1="7" x2="7.01" y2="7" />
+                      </svg>
+                      Tags
+                    </label>
+                    <div className="card-modal__tags-presets">
+                      {PRESET_TAGS.map((preset) => {
+                        const active = isTagActive(preset.name);
+                        return (
+                          <button
+                            key={preset.name}
+                            className={`card-modal__tag-preset card-modal__tag-preset--${preset.color} ${active ? 'card-modal__tag-preset--active' : ''}`}
+                            onClick={() => {
+                              if (active) {
+                                const tag = tags.find(t => t.name === preset.name);
+                                if (tag) onRemoveTag?.(tag.id);
+                              } else {
+                                onAddTag?.(preset.name, preset.color);
+                              }
+                            }}
+                          >
+                            {active && (
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                            )}
+                            {preset.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Active tags */}
+                    {tags && tags.length > 0 && (
+                      <div className="card-modal__tags-active">
+                        {tags.map((tag) => (
+                          <span key={tag.id} className={`card-modal__tag card-modal__tag--${tag.color}`}>
+                            {tag.name}
+                            <button onClick={() => onRemoveTag?.(tag.id)} className="card-modal__tag-remove">
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                              </svg>
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Custom tag input */}
+                    <div className="card-modal__custom-tag">
+                      <input
+                        className="card-modal__custom-tag-input"
+                        placeholder="Add custom tag..."
+                        value={customTagName}
+                        onChange={(e) => setCustomTagName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') { e.preventDefault(); handleAddCustomTag(); }
+                        }}
+                      />
+                      <button
+                        className="card-modal__custom-tag-btn"
+                        onClick={handleAddCustomTag}
+                        disabled={!customTagName.trim()}
+                      >
+                        <Icons.Plus />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Description Section */}
+                  <div className="card-modal__section">
+                    <label className="card-modal__label">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="17" y1="10" x2="3" y2="10" />
+                        <line x1="21" y1="6" x2="3" y2="6" />
+                        <line x1="21" y1="14" x2="3" y2="14" />
+                        <line x1="17" y1="18" x2="3" y2="18" />
+                      </svg>
+                      Description
+                    </label>
+                    <textarea
+                      className="card-modal__desc-input"
+                      value={description}
+                      onChange={(e) => onDescriptionChange?.(e.target.value)}
+                      placeholder="Add a more detailed description..."
+                      rows={5}
+                    />
+                  </div>
+                </>
+              )}
+
+              {activeSection === 'comments' && (
+                <div className="card-modal__comments">
+                  {/* Comments list */}
+                  <div className="card-modal__comments-list">
+                    {(!comments || comments.length === 0) && (
+                      <div className="card-modal__comments-empty">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                        </svg>
+                        <p>No comments yet</p>
+                        <span>Be the first to comment on this card</span>
+                      </div>
+                    )}
+                    {comments && comments.map((c) => (
+                      <div key={c.id} className="card-modal__comment">
+                        <div className="card-modal__comment-avatar">
+                          {(c.user_email || '').slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="card-modal__comment-body">
+                          <div className="card-modal__comment-meta">
+                            <span className="card-modal__comment-author">{c.user_email}</span>
+                            <span className="card-modal__comment-time">{formatTime(c.created_at)}</span>
+                          </div>
+                          <div className="card-modal__comment-content">{c.content}</div>
+                        </div>
+                      </div>
+                    ))}
+                    <div ref={commentsEndRef} />
+                  </div>
+
+                  {/* Comment composer */}
+                  <div className="card-modal__comment-compose">
+                    <div className="card-modal__comment-compose-avatar">
+                      {(user?.email || '').slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="card-modal__comment-compose-input-wrap">
+                      <textarea
+                        className="card-modal__comment-compose-input"
+                        placeholder="Leave a comment..."
+                        value={commentDraft}
+                        onChange={(e) => setCommentDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handlePostComment();
+                          }
+                        }}
+                        rows={2}
+                      />
+                      <button
+                        className="card-modal__comment-send"
+                        onClick={handlePostComment}
+                        disabled={!commentDraft.trim()}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <line x1="22" y1="2" x2="11" y2="13" />
+                          <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {error && <div className="card-modal__error">{error}</div>}
+
+            {/* Footer Actions */}
+            <div className="card-modal__actions">
+              <Button variant="primary" onClick={onSave} disabled={saving} loading={saving}>
+                Save Changes
+              </Button>
+              <Button variant="ghost" onClick={onClose} disabled={saving}>
+                Cancel
+              </Button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
