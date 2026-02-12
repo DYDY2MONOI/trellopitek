@@ -13,6 +13,7 @@ import { SearchInput } from './components/ui/Input';
 import { Card, CardContent } from './components/ui/Card';
 import { Badge } from './components/ui/Badge';
 import { Avatar, AvatarGroup } from './components/ui/Avatar';
+import { ClipboardIcon, ZapIcon, BarChartIcon, SunIcon, MoonIcon, UsersIcon } from './components/ui/Icons';
 
 // Pages
 import BoardsPage from './pages/BoardsPage';
@@ -275,17 +276,17 @@ function LandingPage({
     {
       title: 'Boards that adapt',
       description: 'Track work across teams with flexible lists, swimlanes, and checklists tailored to your process.',
-      icon: '📋',
+      icon: <ClipboardIcon size={28} />,
     },
     {
       title: 'Automations built-in',
       description: 'Let rules move cards, send updates, and keep everyone aligned without manual effort.',
-      icon: '⚡',
+      icon: <ZapIcon size={28} />,
     },
     {
       title: 'Insights at a glance',
       description: 'Surface workloads, blockers, and trends instantly with dashboards driven by live board data.',
-      icon: '📊',
+      icon: <BarChartIcon size={28} />,
     },
   ];
 
@@ -308,7 +309,7 @@ function LandingPage({
 
         <div className="landing-header__actions">
           <Button variant="ghost" size="sm" onClick={onToggleTheme}>
-            {theme === 'light' ? '🌙' : '☀️'}
+            {theme === 'light' ? <MoonIcon size={18} /> : <SunIcon size={18} />}
           </Button>
           {isAuthenticated ? (
             <>
@@ -575,7 +576,7 @@ function BoardsIndexPage({ authToken, boards, setBoards, user }) {
                               <p className="board-card__meta">
                                 Created {new Date(board.created_at).toLocaleDateString()}
                               </p>
-                              <span className="board-card__shared-badge">👥 Shared</span>
+                              <span className="board-card__shared-badge"><UsersIcon size={14} /> Shared</span>
                             </CardContent>
                           </Card>
                         ))}
@@ -627,21 +628,40 @@ function TemplatesGalleryPage({ authToken }) {
   const navigate = useNavigate();
   const [error, setError] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [namingTemplate, setNamingTemplate] = useState(null);
+  const [boardName, setBoardName] = useState('');
 
-  const handleUseTemplate = async (title) => {
+  const handleUseTemplate = async () => {
     if (!authToken) {
       setError('Please log in first.');
       return;
     }
+    const name = boardName.trim();
+    if (!name) {
+      setError('Please enter a board name.');
+      return;
+    }
     try {
       setCreating(true);
-      const board = await api.createBoard(title, authToken);
+      const board = await api.createBoard(name, authToken);
       navigate(`/user/boards/${board.id}`);
     } catch {
       setError('Unable to create board from template.');
     } finally {
       setCreating(false);
     }
+  };
+
+  const handleStartNaming = (tpl) => {
+    setNamingTemplate(tpl.title);
+    setBoardName(tpl.title);
+    setError(null);
+  };
+
+  const handleCancelNaming = () => {
+    setNamingTemplate(null);
+    setBoardName('');
+    setError(null);
   };
 
   const templates = [
@@ -676,14 +696,49 @@ function TemplatesGalleryPage({ authToken }) {
                 <h3>{tpl.title}</h3>
                 <p>{tpl.desc}</p>
               </div>
-              <Button
-                variant="primary"
-                onClick={() => handleUseTemplate(tpl.title)}
-                disabled={!authToken || creating}
-                loading={creating}
-              >
-                Use template
-              </Button>
+              {namingTemplate === tpl.title ? (
+                <div className="template-naming">
+                  <input
+                    className="template-naming__input"
+                    type="text"
+                    value={boardName}
+                    onChange={(e) => setBoardName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleUseTemplate();
+                      if (e.key === 'Escape') handleCancelNaming();
+                    }}
+                    placeholder="Enter board name..."
+                    autoFocus
+                  />
+                  <div className="template-naming__actions">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={handleUseTemplate}
+                      disabled={!boardName.trim() || creating}
+                      loading={creating}
+                    >
+                      Create
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleCancelNaming}
+                      disabled={creating}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="primary"
+                  onClick={() => handleStartNaming(tpl)}
+                  disabled={!authToken || creating}
+                >
+                  Use template
+                </Button>
+              )}
             </div>
           ))}
         </div>
