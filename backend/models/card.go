@@ -3,12 +3,14 @@ package models
 import "database/sql"
 
 type Card struct {
-	ID       int    `json:"id"`
-	ListID   int    `json:"list_id"`
-	Title    string `json:"title"`
-	Badge    string `json:"badge"`
-	Color    string `json:"color"`
-	Position int    `json:"position"`
+	ID          int       `json:"id"`
+	ListID      int       `json:"list_id"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	Badge       string    `json:"badge"`
+	Color       string    `json:"color"`
+	Position    int       `json:"position"`
+	Tags        []CardTag `json:"tags,omitempty"`
 }
 
 type CardService struct{ DB *sql.DB }
@@ -27,8 +29,8 @@ func (s *CardService) CreateCard(listID int, title, badge, color string, positio
 
 func (s *CardService) GetCardByID(id int) (*Card, error) {
 	var c Card
-	err := s.DB.QueryRow("SELECT id, list_id, title, badge, color, position FROM cards WHERE id=$1", id).
-		Scan(&c.ID, &c.ListID, &c.Title, &c.Badge, &c.Color, &c.Position)
+	err := s.DB.QueryRow("SELECT id, list_id, title, COALESCE(description,''), badge, color, position FROM cards WHERE id=$1", id).
+		Scan(&c.ID, &c.ListID, &c.Title, &c.Description, &c.Badge, &c.Color, &c.Position)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +38,7 @@ func (s *CardService) GetCardByID(id int) (*Card, error) {
 }
 
 func (s *CardService) GetCardsByList(listID int) ([]Card, error) {
-	rows, err := s.DB.Query("SELECT id, list_id, title, badge, color, position FROM cards WHERE list_id=$1 ORDER BY position, id", listID)
+	rows, err := s.DB.Query("SELECT id, list_id, title, COALESCE(description,''), badge, color, position FROM cards WHERE list_id=$1 ORDER BY position, id", listID)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +46,7 @@ func (s *CardService) GetCardsByList(listID int) ([]Card, error) {
 	var out []Card
 	for rows.Next() {
 		var c Card
-		if err := rows.Scan(&c.ID, &c.ListID, &c.Title, &c.Badge, &c.Color, &c.Position); err != nil {
+		if err := rows.Scan(&c.ID, &c.ListID, &c.Title, &c.Description, &c.Badge, &c.Color, &c.Position); err != nil {
 			return nil, err
 		}
 		out = append(out, c)
@@ -52,10 +54,10 @@ func (s *CardService) GetCardsByList(listID int) ([]Card, error) {
 	return out, rows.Err()
 }
 
-func (s *CardService) UpdateCard(id int, title, badge, color string, listID int, position int) (*Card, error) {
+func (s *CardService) UpdateCard(id int, title, description, badge, color string, listID int, position int) (*Card, error) {
 	_, err := s.DB.Exec(
-		"UPDATE cards SET title=$1, badge=$2, color=$3, list_id=$4, position=$5 WHERE id=$6",
-		title, badge, color, listID, position, id,
+		"UPDATE cards SET title=$1, description=$2, badge=$3, color=$4, list_id=$5, position=$6 WHERE id=$7",
+		title, description, badge, color, listID, position, id,
 	)
 	if err != nil {
 		return nil, err
