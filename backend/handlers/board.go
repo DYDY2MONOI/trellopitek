@@ -12,23 +12,36 @@ import (
 )
 
 type BoardHandler struct {
-	Boards *models.BoardService
-	Lists  *models.ListService
-	Cards  *models.CardService
+	Boards       *models.BoardService
+	Lists        *models.ListService
+	Cards        *models.CardService
+	BoardMembers *models.BoardMemberService
+	Users        *models.UserService
 }
 
 func NewBoardHandler(db *sql.DB) *BoardHandler {
 	return &BoardHandler{
-		Boards: &models.BoardService{DB: db},
-		Lists:  &models.ListService{DB: db},
-		Cards:  &models.CardService{DB: db},
+		Boards:       &models.BoardService{DB: db},
+		Lists:        &models.ListService{DB: db},
+		Cards:        &models.CardService{DB: db},
+		BoardMembers: &models.BoardMemberService{DB: db},
+		Users:        &models.UserService{DB: db},
 	}
 }
 
 func (h *BoardHandler) ListBoards(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	userID := r.Context().Value("userID").(int)
-	rows, err := h.Boards.DB.Query("SELECT id, user_id, title, created_at FROM boards WHERE user_id=$1 ORDER BY created_at DESC", userID)
+
+	// Get boards owned by user AND boards shared with user
+	rows, err := h.Boards.DB.Query(
+		`SELECT DISTINCT b.id, b.user_id, b.title, b.created_at
+		 FROM boards b
+		 LEFT JOIN board_members bm ON bm.board_id = b.id
+		 WHERE b.user_id = $1 OR bm.user_id = $1
+		 ORDER BY b.created_at DESC`,
+		userID,
+	)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -42,6 +55,9 @@ func (h *BoardHandler) ListBoards(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		out = append(out, b)
+	}
+	if out == nil {
+		out = []models.Board{}
 	}
 	json.NewEncoder(w).Encode(out)
 }
@@ -58,11 +74,21 @@ func (h *BoardHandler) GetBoard(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	vars := mux.Vars(r)
 	id, _ := strconv.Atoi(vars["id"])
+	userID := r.Context().Value("userID").(int)
 
 	b, err := h.Boards.GetBoardByID(id)
 	if err != nil {
 		http.Error(w, "board not found", http.StatusNotFound)
 		return
+	}
+
+	// Check access: owner or member
+	if b.UserID != userID {
+		isMember, err := h.BoardMembers.IsMember(id, userID)
+		if err != nil || !isMember {
+			http.Error(w, "access denied", http.StatusForbidden)
+			return
+		}
 	}
 
 	lists, err := h.Lists.GetListsByBoard(b.ID)
@@ -142,6 +168,9 @@ func (h *BoardHandler) CreateBoard(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	// Add creator as owner in board_members
+	_, _ = h.BoardMembers.AddMember(b.ID, userID, "owner")
 
 	defaults := []struct{ Title, Accent string }{
 		{"Ideas", "accent"}, {"In Progress", "primary"}, {"Review", "warning"}, {"Done", "success"},
@@ -265,4 +294,169 @@ func (h *BoardHandler) UpdateCard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(updated)
+}
+
+// ============ Collaboration Endpoints ============
+
+func (h *BoardHandler) GetBoardMembers(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	vars := mux.Vars(r)
+	boardID, err := strconv.Atoi(vars["id"])
+	if err != nil || boardID <= 0 {
+		http.Error(w, "invalid board id", http.StatusBadRequest)
+		return
+	}
+
+	userID := r.Context().Value("userID").(int)
+
+	// Verify the user has access to this board
+	board, err := h.Boards.GetBoardByID(boardID)
+	if err != nil {
+		http.Error(w, "board not found", http.StatusNotFound)
+		return
+	}
+	if board.UserID != userID {
+		isMember, err := h.BoardMembers.IsMember(boardID, userID)
+		if err != nil || !isMember {
+			http.Error(w, "access denied", http.StatusForbidden)
+			return
+		}
+	}
+
+	members, err := h.BoardMembers.GetMembersByBoard(boardID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if members == nil {
+		members = []models.BoardMember{}
+	}
+	json.NewEncoder(w).Encode(members)
+}
+
+func (h *BoardHandler) InviteMember(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	vars := mux.Vars(r)
+	boardID, err := strconv.Atoi(vars["id"])
+	if err != nil || boardID <= 0 {
+		http.Error(w, "invalid board id", http.StatusBadRequest)
+		return
+	}
+
+	userID := r.Context().Value("userID").(int)
+
+	// Only the board owner can invite members
+	board, err := h.Boards.GetBoardByID(boardID)
+	if err != nil {
+		http.Error(w, "board not found", http.StatusNotFound)
+		return
+	}
+	if board.UserID != userID {
+		http.Error(w, "only the board owner can invite members", http.StatusForbidden)
+		return
+	}
+
+	var body struct {
+		Email string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Email == "" {
+		http.Error(w, "email is required", http.StatusBadRequest)
+		return
+	}
+
+	// Find the user by email
+	invitedUser, _, err := h.Users.GetUserByEmail(body.Email)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "User not found with this email"})
+		return
+	}
+
+	// Can't invite yourself
+	if invitedUser.ID == userID {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "You cannot invite yourself"})
+		return
+	}
+
+	// Check if already a member
+	isMember, _ := h.BoardMembers.IsMember(boardID, invitedUser.ID)
+	if isMember {
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(map[string]string{"error": "User is already a member of this board"})
+		return
+	}
+
+	member, err := h.BoardMembers.AddMember(boardID, invitedUser.ID, "member")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(member)
+}
+
+func (h *BoardHandler) RemoveMember(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	vars := mux.Vars(r)
+	boardID, err := strconv.Atoi(vars["id"])
+	if err != nil || boardID <= 0 {
+		http.Error(w, "invalid board id", http.StatusBadRequest)
+		return
+	}
+	memberUserID, err := strconv.Atoi(vars["userId"])
+	if err != nil || memberUserID <= 0 {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+
+	userID := r.Context().Value("userID").(int)
+
+	// Only the board owner can remove members
+	board, err := h.Boards.GetBoardByID(boardID)
+	if err != nil {
+		http.Error(w, "board not found", http.StatusNotFound)
+		return
+	}
+	if board.UserID != userID {
+		http.Error(w, "only the board owner can remove members", http.StatusForbidden)
+		return
+	}
+
+	// Can't remove the owner
+	if memberUserID == userID {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Cannot remove the board owner"})
+		return
+	}
+
+	err = h.BoardMembers.RemoveMember(boardID, memberUserID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Member removed successfully"})
+}
+
+func (h *BoardHandler) SearchUsers(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	userID := r.Context().Value("userID").(int)
+
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	if query == "" || len(query) < 2 {
+		json.NewEncoder(w).Encode([]models.User{})
+		return
+	}
+
+	users, err := h.Users.SearchUsersByEmail(query, userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if users == nil {
+		users = []models.User{}
+	}
+	json.NewEncoder(w).Encode(users)
 }
