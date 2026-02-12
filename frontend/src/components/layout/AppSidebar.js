@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Avatar } from '../ui/Avatar';
 import { ProgressCircle } from '../ui/ProgressCircle';
 import { SearchInput } from '../ui/Input';
+import { SunIcon, MoonIcon } from '../ui/Icons';
 import './AppSidebar.css';
 
 // Icons (using inline SVG for simplicity)
@@ -112,11 +113,10 @@ export function AppSidebar({
     const navigate = useNavigate();
     const location = useLocation();
 
-    // Active projects - take first 5 boards with fake progress
+    // Active projects - take first 5 boards
     const activeProjects = boards.slice(0, 5).map((board, idx) => ({
         id: board.id,
         name: board.title,
-        progress: Math.floor(Math.random() * 100),
         color: ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'][idx % 5],
     }));
 
@@ -187,7 +187,7 @@ export function AppSidebar({
                                     onClick={() => navigate(`/user/boards/${project.id}`)}
                                 >
                                     <ProgressCircle
-                                        progress={project.progress}
+                                        progress={0}
                                         size={18}
                                         strokeWidth={2}
                                         color={project.color}
@@ -228,7 +228,7 @@ export function AppSidebar({
 
             {/* Theme Toggle */}
             <button className="sidebar-theme-toggle" onClick={onToggleTheme}>
-                {theme === 'light' ? '🌙 Dark mode' : '☀️ Light mode'}
+                {theme === 'light' ? <><MoonIcon size={16} /> Dark mode</> : <><SunIcon size={16} /> Light mode</>}
             </button>
 
             {/* User Profile */}
