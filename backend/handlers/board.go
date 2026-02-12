@@ -17,6 +17,8 @@ type BoardHandler struct {
 	Cards        *models.CardService
 	BoardMembers *models.BoardMemberService
 	Users        *models.UserService
+	CardTags     *models.CardTagService
+	CardComments *models.CardCommentService
 }
 
 func NewBoardHandler(db *sql.DB) *BoardHandler {
@@ -26,6 +28,8 @@ func NewBoardHandler(db *sql.DB) *BoardHandler {
 		Cards:        &models.CardService{DB: db},
 		BoardMembers: &models.BoardMemberService{DB: db},
 		Users:        &models.UserService{DB: db},
+		CardTags:     &models.CardTagService{DB: db},
+		CardComments: &models.CardCommentService{DB: db},
 	}
 }
 
@@ -62,11 +66,16 @@ func (h *BoardHandler) ListBoards(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(out)
 }
 
+type cardWithTags struct {
+	models.Card `json:",inline"`
+	Tags        []models.CardTag `json:"tags"`
+}
+
 type boardDetail struct {
 	models.Board `json:",inline"`
 	Lists        []struct {
 		models.List `json:",inline"`
-		Cards       []models.Card `json:"cards"`
+		Cards       []cardWithTags `json:"cards"`
 	} `json:"lists"`
 }
 
@@ -104,13 +113,22 @@ func (h *BoardHandler) GetBoard(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		var cardsWithTags []cardWithTags
 		for i := range cards {
 			cards[i].Color = normalizeCardColor(cards[i].Color, l)
+			tags, _ := h.CardTags.GetTagsByCard(cards[i].ID)
+			if tags == nil {
+				tags = []models.CardTag{}
+			}
+			cardsWithTags = append(cardsWithTags, cardWithTags{Card: cards[i], Tags: tags})
+		}
+		if cardsWithTags == nil {
+			cardsWithTags = []cardWithTags{}
 		}
 		item := struct {
 			models.List `json:",inline"`
-			Cards       []models.Card `json:"cards"`
-		}{List: l, Cards: cards}
+			Cards       []cardWithTags `json:"cards"`
+		}{List: l, Cards: cardsWithTags}
 		resp.Lists = append(resp.Lists, item)
 	}
 	json.NewEncoder(w).Encode(resp)
@@ -228,6 +246,40 @@ func (h *BoardHandler) CreateCard(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(card)
 }
 
+func (h *BoardHandler) GetCard(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil || id <= 0 {
+		http.Error(w, "invalid card id", http.StatusBadRequest)
+		return
+	}
+
+	card, err := h.Cards.GetCardByID(id)
+	if err != nil {
+		http.Error(w, "card not found", http.StatusNotFound)
+		return
+	}
+
+	tags, _ := h.CardTags.GetTagsByCard(id)
+	if tags == nil {
+		tags = []models.CardTag{}
+	}
+
+	comments, _ := h.CardComments.GetCommentsByCard(id)
+	if comments == nil {
+		comments = []models.CardComment{}
+	}
+
+	resp := struct {
+		*models.Card `json:",inline"`
+		Tags         []models.CardTag     `json:"tags"`
+		Comments     []models.CardComment `json:"comments"`
+	}{Card: card, Tags: tags, Comments: comments}
+
+	json.NewEncoder(w).Encode(resp)
+}
+
 func (h *BoardHandler) UpdateCard(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	vars := mux.Vars(r)
@@ -244,11 +296,12 @@ func (h *BoardHandler) UpdateCard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		Title    *string `json:"title"`
-		Badge    *string `json:"badge"`
-		Color    *string `json:"color"`
-		ListID   *int    `json:"listId"`
-		Position *int    `json:"position"`
+		Title       *string `json:"title"`
+		Description *string `json:"description"`
+		Badge       *string `json:"badge"`
+		Color       *string `json:"color"`
+		ListID      *int    `json:"listId"`
+		Position    *int    `json:"position"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid payload", http.StatusBadRequest)
@@ -261,6 +314,11 @@ func (h *BoardHandler) UpdateCard(w http.ResponseWriter, r *http.Request) {
 		if t != "" {
 			newTitle = t
 		}
+	}
+
+	newDescription := existing.Description
+	if body.Description != nil {
+		newDescription = *body.Description
 	}
 
 	newBadge := existing.Badge
@@ -287,13 +345,124 @@ func (h *BoardHandler) UpdateCard(w http.ResponseWriter, r *http.Request) {
 		newPosition = *body.Position
 	}
 
-	updated, err := h.Cards.UpdateCard(id, newTitle, newBadge, newColor, newListID, newPosition)
+	updated, err := h.Cards.UpdateCard(id, newTitle, newDescription, newBadge, newColor, newListID, newPosition)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	json.NewEncoder(w).Encode(updated)
+}
+
+// ============ Card Tags Endpoints ============
+
+func (h *BoardHandler) AddCardTag(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	vars := mux.Vars(r)
+	cardID, err := strconv.Atoi(vars["id"])
+	if err != nil || cardID <= 0 {
+		http.Error(w, "invalid card id", http.StatusBadRequest)
+		return
+	}
+
+	// Verify card exists
+	if _, err := h.Cards.GetCardByID(cardID); err != nil {
+		http.Error(w, "card not found", http.StatusNotFound)
+		return
+	}
+
+	var body struct {
+		Name  string `json:"name"`
+		Color string `json:"color"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Name) == "" {
+		http.Error(w, "name is required", http.StatusBadRequest)
+		return
+	}
+	if body.Color == "" {
+		body.Color = "primary"
+	}
+
+	tag, err := h.CardTags.AddTag(cardID, strings.TrimSpace(body.Name), body.Color)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(tag)
+}
+
+func (h *BoardHandler) RemoveCardTag(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	vars := mux.Vars(r)
+	tagID, err := strconv.Atoi(vars["tagId"])
+	if err != nil || tagID <= 0 {
+		http.Error(w, "invalid tag id", http.StatusBadRequest)
+		return
+	}
+
+	err = h.CardTags.RemoveTag(tagID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{"message": "Tag removed"})
+}
+
+// ============ Card Comments Endpoints ============
+
+func (h *BoardHandler) GetCardComments(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	vars := mux.Vars(r)
+	cardID, err := strconv.Atoi(vars["id"])
+	if err != nil || cardID <= 0 {
+		http.Error(w, "invalid card id", http.StatusBadRequest)
+		return
+	}
+
+	comments, err := h.CardComments.GetCommentsByCard(cardID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if comments == nil {
+		comments = []models.CardComment{}
+	}
+	json.NewEncoder(w).Encode(comments)
+}
+
+func (h *BoardHandler) AddCardComment(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	vars := mux.Vars(r)
+	cardID, err := strconv.Atoi(vars["id"])
+	if err != nil || cardID <= 0 {
+		http.Error(w, "invalid card id", http.StatusBadRequest)
+		return
+	}
+	userID := r.Context().Value("userID").(int)
+
+	// Verify card exists
+	if _, err := h.Cards.GetCardByID(cardID); err != nil {
+		http.Error(w, "card not found", http.StatusNotFound)
+		return
+	}
+
+	var body struct {
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Content) == "" {
+		http.Error(w, "content is required", http.StatusBadRequest)
+		return
+	}
+
+	comment, err := h.CardComments.AddComment(cardID, userID, strings.TrimSpace(body.Content))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(comment)
 }
 
 // ============ Collaboration Endpoints ============
