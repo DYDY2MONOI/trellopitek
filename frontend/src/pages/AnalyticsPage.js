@@ -11,7 +11,7 @@ import './AnalyticsPage.css';
  * Analytics Page - Board and productivity statistics
  */
 function AnalyticsPage({ authToken }) {
-    const [boards, setBoards] = useState([]);
+
     const [loading, setLoading] = useState(true);
     const [boardProgressData, setBoardProgressData] = useState([]);
     const [stats, setStats] = useState({
@@ -32,7 +32,7 @@ function AnalyticsPage({ authToken }) {
             try {
                 const data = await api.getBoards(authToken);
                 if (!cancelled) {
-                    setBoards(data || []);
+
 
                     // Calculate stats
                     let perBoardProgress = [];
