@@ -97,6 +97,24 @@ func InitDB() (*sql.DB, error) {
         return nil, err
     }
 
+    createBoardMembersTableSQL := `
+    CREATE TABLE IF NOT EXISTS board_members (
+        id SERIAL PRIMARY KEY,
+        board_id INTEGER NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role TEXT NOT NULL DEFAULT 'member',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(board_id, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_board_members_board_id ON board_members(board_id);
+    CREATE INDEX IF NOT EXISTS idx_board_members_user_id ON board_members(user_id);
+    `
+
+    _, err = db.Exec(createBoardMembersTableSQL)
+    if err != nil {
+        return nil, err
+    }
+
 	DB = db
 	log.Println("Database initialized successfully")
 	return db, nil
