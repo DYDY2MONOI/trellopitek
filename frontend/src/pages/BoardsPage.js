@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { api } from '../services/api';
+import ShareBoardModal from '../components/ShareBoardModal';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { PageHeader, PageContent } from '../components/layout/MainLayout';
@@ -143,7 +144,7 @@ function moveCardBetweenColumns(columns, sourceColIndex, destColIndex, sourceInd
 }
 
 // ============ Main Component ============
-export default function BoardsPage({ authToken }) {
+export default function BoardsPage({ authToken, user }) {
   const { boardId } = useParams();
   const navigate = useNavigate();
 
@@ -158,6 +159,9 @@ export default function BoardsPage({ authToken }) {
   const [editingSaving, setEditingSaving] = useState(false);
   const [boardLoading, setBoardLoading] = useState(true);
   const [boardError, setBoardError] = useState(null);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [boardMembers, setBoardMembers] = useState([]);
+  const [boardOwnerID, setBoardOwnerID] = useState(null);
 
   // Load board data
   useEffect(() => {
@@ -186,7 +190,13 @@ export default function BoardsPage({ authToken }) {
           })),
         })));
         setColumns(mapped);
+        setBoardOwnerID(detail.user_id);
         setBoardLoading(false);
+        // Load members
+        try {
+          const membersData = await api.getBoardMembers(boardId, authToken);
+          setBoardMembers(membersData || []);
+        } catch { /* silently fail */ }
       } catch (e) {
         if (!cancelled) {
           setBoardError('Unable to load this board.');
@@ -394,6 +404,25 @@ export default function BoardsPage({ authToken }) {
           </h1>
         </div>
         <div className="board-header__right">
+          {/* Member Avatars */}
+          {boardMembers.length > 0 && (
+            <div className="board-header__members">
+              {boardMembers.slice(0, 4).map((m) => (
+                <div
+                  key={m.id}
+                  className={`board-header__member-avatar board-header__member-avatar--${m.role}`}
+                  title={m.email}
+                >
+                  {m.email ? m.email.slice(0, 2).toUpperCase() : '?'}
+                </div>
+              ))}
+              {boardMembers.length > 4 && (
+                <div className="board-header__member-more">
+                  +{boardMembers.length - 4}
+                </div>
+              )}
+            </div>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -405,7 +434,7 @@ export default function BoardsPage({ authToken }) {
           <Button variant="ghost" size="icon">
             <Icons.MoreHorizontal />
           </Button>
-          <Button variant="primary" size="sm">Share</Button>
+          <Button variant="primary" size="sm" onClick={() => setShowShareModal(true)}>Share</Button>
         </div>
       </header>
 
@@ -549,6 +578,23 @@ export default function BoardsPage({ authToken }) {
           onClose={closeCardEditor}
           saving={editingSaving}
           error={editingError}
+        />
+      )}
+
+      {/* Share Modal */}
+      {showShareModal && (
+        <ShareBoardModal
+          boardId={boardId}
+          boardOwnerId={boardOwnerID}
+          authToken={authToken}
+          currentUserEmail={user?.email}
+          onClose={() => {
+            setShowShareModal(false);
+            // Refresh members
+            api.getBoardMembers(boardId, authToken)
+              .then((data) => setBoardMembers(data || []))
+              .catch(() => { });
+          }}
         />
       )}
     </div>
