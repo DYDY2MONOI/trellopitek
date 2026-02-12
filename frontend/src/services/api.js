@@ -164,6 +164,57 @@ export const api = {
     if (!response.ok) throw new Error('Failed to search users');
     return response.json();
   },
+
+  async getCard(cardId, token) {
+    const response = await fetch(`${API_URL}/cards/${cardId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Failed to fetch card');
+    return response.json();
+  },
+
+  async addCardTag(cardId, { name, color }, token) {
+    const response = await fetch(`${API_URL}/cards/${cardId}/tags`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ name, color }),
+    });
+    if (!response.ok) throw new Error('Failed to add tag');
+    return response.json();
+  },
+
+  async removeCardTag(cardId, tagId, token) {
+    const response = await fetch(`${API_URL}/cards/${cardId}/tags/${tagId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error('Failed to remove tag');
+    return response.json();
+  },
+
+  async getCardComments(cardId, token) {
+    const response = await fetch(`${API_URL}/cards/${cardId}/comments`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Failed to fetch comments');
+    return response.json();
+  },
+
+  async addCardComment(cardId, content, token) {
+    const response = await fetch(`${API_URL}/cards/${cardId}/comments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ content }),
+    });
+    if (!response.ok) throw new Error('Failed to add comment');
+    return response.json();
+  },
 };
 
 export const setAuthToken = (token) => {
