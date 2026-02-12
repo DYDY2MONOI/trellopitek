@@ -206,12 +206,15 @@ function App() {
                 authToken={authTokenState}
                 boards={boards}
                 setBoards={setBoards}
+                user={user}
               />
             }
           />
           <Route
             path="/user/boards/:boardId"
-            element={<BoardsPage authToken={authTokenState} />}
+            element={
+              <BoardsPage authToken={authTokenState} user={user} />
+            }
           />
           <Route
             path="/user/boards/templates"
@@ -442,7 +445,7 @@ function BoardPreview() {
 }
 
 // ============ Boards Index Page ============
-function BoardsIndexPage({ authToken, boards, setBoards }) {
+function BoardsIndexPage({ authToken, boards, setBoards, user }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
@@ -533,23 +536,53 @@ function BoardsIndexPage({ authToken, boards, setBoards }) {
                   </Button>
                 </div>
               ) : (
-                <div className="boards-grid">
-                  {boards.map((board, idx) => (
-                    <Card
-                      key={board.id}
-                      hoverable
-                      className={`board-card board-card--accent-${idx % 6}`}
-                      onClick={() => navigate(`/user/boards/${board.id}`)}
-                    >
-                      <CardContent>
-                        <h4 className="board-card__title">{board.title}</h4>
-                        <p className="board-card__meta">
-                          Created {new Date(board.created_at).toLocaleDateString()}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                <>
+                  {/* Owned boards */}
+                  <div className="boards-grid">
+                    {boards.filter(b => b.user_id === (user?.id)).map((board, idx) => (
+                      <Card
+                        key={board.id}
+                        hoverable
+                        className={`board-card board-card--accent-${idx % 6}`}
+                        onClick={() => navigate(`/user/boards/${board.id}`)}
+                      >
+                        <CardContent>
+                          <h4 className="board-card__title">{board.title}</h4>
+                          <p className="board-card__meta">
+                            Created {new Date(board.created_at).toLocaleDateString()}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+
+                  {/* Shared boards */}
+                  {boards.filter(b => b.user_id !== (user?.id)).length > 0 && (
+                    <>
+                      <div className="boards-section__header" style={{ marginTop: '24px' }}>
+                        <h3>Shared with me</h3>
+                      </div>
+                      <div className="boards-grid">
+                        {boards.filter(b => b.user_id !== (user?.id)).map((board, idx) => (
+                          <Card
+                            key={board.id}
+                            hoverable
+                            className={`board-card board-card--accent-${(idx + 3) % 6}`}
+                            onClick={() => navigate(`/user/boards/${board.id}`)}
+                          >
+                            <CardContent>
+                              <h4 className="board-card__title">{board.title}</h4>
+                              <p className="board-card__meta">
+                                Created {new Date(board.created_at).toLocaleDateString()}
+                              </p>
+                              <span className="board-card__shared-badge">👥 Shared</span>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </>
               )}
             </section>
 
