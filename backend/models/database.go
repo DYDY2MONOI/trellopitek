@@ -150,6 +150,40 @@ func InitDB() (*sql.DB, error) {
         return nil, err
     }
 
+    // Add due_date column if it doesn't exist
+    _, _ = db.Exec(`ALTER TABLE cards ADD COLUMN IF NOT EXISTS due_date TIMESTAMPTZ`)
+
+    createCardMembersTableSQL := `
+    CREATE TABLE IF NOT EXISTS card_members (
+        id SERIAL PRIMARY KEY,
+        card_id INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(card_id, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_card_members_card_id ON card_members(card_id);
+    `
+    _, err = db.Exec(createCardMembersTableSQL)
+    if err != nil {
+        return nil, err
+    }
+
+    createActivitiesTableSQL := `
+    CREATE TABLE IF NOT EXISTS activities (
+        id SERIAL PRIMARY KEY,
+        card_id INTEGER REFERENCES cards(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        action_type TEXT NOT NULL, 
+        details TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_activities_card_id ON activities(card_id);
+    `
+    _, err = db.Exec(createActivitiesTableSQL)
+    if err != nil {
+        return nil, err
+    }
+
 	DB = db
 	log.Println("Database initialized successfully")
 	return db, nil

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gorilla/mux"
 	"trellomirror/backend/models"
@@ -19,6 +20,8 @@ type BoardHandler struct {
 	Users        *models.UserService
 	CardTags     *models.CardTagService
 	CardComments *models.CardCommentService
+	CardMembers  *models.CardMemberService
+	Activities   *models.ActivityService
 }
 
 func NewBoardHandler(db *sql.DB) *BoardHandler {
@@ -30,6 +33,8 @@ func NewBoardHandler(db *sql.DB) *BoardHandler {
 		Users:        &models.UserService{DB: db},
 		CardTags:     &models.CardTagService{DB: db},
 		CardComments: &models.CardCommentService{DB: db},
+		CardMembers:  &models.CardMemberService{DB: db},
+		Activities:   &models.ActivityService{DB: db},
 	}
 }
 
@@ -243,6 +248,10 @@ func (h *BoardHandler) CreateCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Log activity
+	userID := r.Context().Value("userID").(int)
+	h.Activities.LogActivity(&card.ID, userID, "create_card", "created this card in list "+l.Title)
+
 	json.NewEncoder(w).Encode(card)
 }
 
@@ -302,6 +311,7 @@ func (h *BoardHandler) UpdateCard(w http.ResponseWriter, r *http.Request) {
 		Color       *string `json:"color"`
 		ListID      *int    `json:"listId"`
 		Position    *int    `json:"position"`
+		DueDate     *string `json:"due_date"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid payload", http.StatusBadRequest)
@@ -345,13 +355,138 @@ func (h *BoardHandler) UpdateCard(w http.ResponseWriter, r *http.Request) {
 		newPosition = *body.Position
 	}
 
-	updated, err := h.Cards.UpdateCard(id, newTitle, newDescription, newBadge, newColor, newListID, newPosition)
+	var newDueDate *time.Time
+	if body.DueDate != nil && *body.DueDate != "" {
+		t, err := time.Parse(time.RFC3339, *body.DueDate)
+		if err == nil {
+			newDueDate = &t
+		}
+	} else if existing.DueDate != nil && body.DueDate != nil && *body.DueDate == "" {
+		// Cleared due date
+		newDueDate = nil
+	} else {
+		newDueDate = existing.DueDate
+	}
+
+	updated, err := h.Cards.UpdateCard(id, newTitle, newDescription, newBadge, newColor, newListID, newPosition, newDueDate)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	// Log activities
+	userID := r.Context().Value("userID").(int)
+	if newListID != existing.ListID {
+		// Fetch list names
+		oldList, _ := h.Lists.GetListByID(existing.ListID)
+		newList, _ := h.Lists.GetListByID(newListID)
+		if oldList != nil && newList != nil {
+			h.Activities.LogActivity(&id, userID, "move_card", "moved this card from "+oldList.Title+" to "+newList.Title)
+		}
+	}
+	// Simplified logging for other changes
+	if newTitle != existing.Title {
+		h.Activities.LogActivity(&id, userID, "update_card", "renamed this card")
+	}
+
 	json.NewEncoder(w).Encode(updated)
+}
+
+// ============ Card Members Endpoints ============
+
+func (h *BoardHandler) AddCardMember(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	vars := mux.Vars(r)
+	cardID, err := strconv.Atoi(vars["id"])
+	if err != nil || cardID <= 0 {
+		http.Error(w, "invalid card id", http.StatusBadRequest)
+		return
+	}
+	userID := r.Context().Value("userID").(int)
+
+	var body struct {
+		UserID int `json:"user_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.UserID <= 0 {
+		http.Error(w, "invalid user id in body", http.StatusBadRequest)
+		return
+	}
+
+	if _, err := h.Cards.GetCardByID(cardID); err != nil {
+		http.Error(w, "card not found", http.StatusNotFound)
+		return
+	}
+
+	if err := h.CardMembers.AddMember(cardID, body.UserID); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Log activity
+	invitedUser, _ := h.Users.GetUserByID(body.UserID)
+	email := "someone"
+	if invitedUser != nil {
+		email = invitedUser.Email
+	}
+	h.Activities.LogActivity(&cardID, userID, "add_member", "assigned "+email+" to this card")
+
+	// Return updated members
+	members, _ := h.CardMembers.GetMembersByCard(cardID)
+	json.NewEncoder(w).Encode(members)
+}
+
+func (h *BoardHandler) RemoveCardMember(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	vars := mux.Vars(r)
+	cardID, err := strconv.Atoi(vars["id"])
+	if err != nil || cardID <= 0 {
+		http.Error(w, "invalid card id", http.StatusBadRequest)
+		return
+	}
+	memberID, err := strconv.Atoi(vars["userId"])
+	if err != nil || memberID <= 0 {
+		http.Error(w, "invalid member user id", http.StatusBadRequest)
+		return
+	}
+	userID := r.Context().Value("userID").(int)
+
+	if err := h.CardMembers.RemoveMember(cardID, memberID); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Log activity
+	removedUser, _ := h.Users.GetUserByID(memberID)
+	email := "someone"
+	if removedUser != nil {
+		email = removedUser.Email
+	}
+	h.Activities.LogActivity(&cardID, userID, "remove_member", "removed "+email+" from this card")
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Member removed"})
+}
+
+// ============ Card Activities Endpoints ============
+
+func (h *BoardHandler) GetCardActivities(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	vars := mux.Vars(r)
+	cardID, err := strconv.Atoi(vars["id"])
+	if err != nil || cardID <= 0 {
+		http.Error(w, "invalid card id", http.StatusBadRequest)
+		return
+	}
+
+	activities, err := h.Activities.GetActivitiesByCard(cardID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if activities == nil {
+		activities = []models.Activity{}
+	}
+	json.NewEncoder(w).Encode(activities)
 }
 
 // ============ Card Tags Endpoints ============

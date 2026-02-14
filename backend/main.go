@@ -45,6 +45,9 @@ func main() {
 	protected.HandleFunc("/cards/{id}/tags/{tagId}", boardHandler.RemoveCardTag).Methods("DELETE")
 	protected.HandleFunc("/cards/{id}/comments", boardHandler.GetCardComments).Methods("GET")
 	protected.HandleFunc("/cards/{id}/comments", boardHandler.AddCardComment).Methods("POST")
+	protected.HandleFunc("/cards/{id}/members", boardHandler.AddCardMember).Methods("POST")
+	protected.HandleFunc("/cards/{id}/members/{userId}", boardHandler.RemoveCardMember).Methods("DELETE")
+	protected.HandleFunc("/cards/{id}/activities", boardHandler.GetCardActivities).Methods("GET")
 
 	port := os.Getenv("PORT")
 	if port == "" {

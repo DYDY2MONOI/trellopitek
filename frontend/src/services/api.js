@@ -215,6 +215,36 @@ export const api = {
     if (!response.ok) throw new Error('Failed to add comment');
     return response.json();
   },
+
+  async addCardMember(cardId, userId, token) {
+    const response = await fetch(`${API_URL}/cards/${cardId}/members`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ user_id: userId }),
+    });
+    if (!response.ok) throw new Error('Failed to add member');
+    return response.json();
+  },
+
+  async removeCardMember(cardId, userId, token) {
+    const response = await fetch(`${API_URL}/cards/${cardId}/members/${userId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error('Failed to remove member');
+    return response.json();
+  },
+
+  async getCardActivities(cardId, token) {
+    const response = await fetch(`${API_URL}/cards/${cardId}/activities`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Failed to fetch activities');
+    return response.json();
+  },
 };
 
 export const setAuthToken = (token) => {
