@@ -8,8 +8,6 @@ import { Badge } from '../components/ui/Badge';
 import { PageHeader, PageContent } from '../components/layout/MainLayout';
 import './BoardsPage.css';
 
-// Icons
-// Preset tags
 const PRESET_TAGS = [
   { name: 'Bug', color: 'destructive' },
   { name: 'Feature', color: 'primary' },
@@ -69,7 +67,6 @@ const Icons = {
   ),
 };
 
-// Column color mapping
 const ACCENT_COLORS = {
   accent: { bg: 'hsl(263 70% 50% / 0.15)', color: 'hsl(263 70% 50%)', border: 'hsl(263 70% 50%)' },
   primary: { bg: 'hsl(217 91% 60% / 0.15)', color: 'hsl(217 91% 60%)', border: 'hsl(217 91% 60%)' },
@@ -78,7 +75,6 @@ const ACCENT_COLORS = {
   destructive: { bg: 'hsl(0 84% 60% / 0.15)', color: 'hsl(0 84% 60%)', border: 'hsl(0 84% 60%)' },
 };
 
-// Default columns
 const defaultKanban = [
   { id: 'col-ideas', listId: null, title: 'Ideas', accent: 'accent', cards: [] },
   { id: 'col-progress', listId: null, title: 'In Progress', accent: 'primary', cards: [] },
@@ -86,7 +82,6 @@ const defaultKanban = [
   { id: 'col-done', listId: null, title: 'Done', accent: 'success', cards: [] },
 ];
 
-// Helpers
 function parseListId(colId) {
   const m = String(colId).match(/^col-(\d+)/);
   return m ? parseInt(m[1], 10) : null;
@@ -156,7 +151,6 @@ function moveCardBetweenColumns(columns, sourceColIndex, destColIndex, sourceInd
   return updated;
 }
 
-// ============ Main Component ============
 export default function BoardsPage({ authToken, user }) {
   const { boardId } = useParams();
   const navigate = useNavigate();
@@ -183,7 +177,6 @@ export default function BoardsPage({ authToken, user }) {
   const [boardMembers, setBoardMembers] = useState([]);
   const [boardOwnerID, setBoardOwnerID] = useState(null);
 
-  // Load board data
   useEffect(() => {
     if (!authToken || !boardId) {
       setBoardLoading(false);
@@ -216,7 +209,6 @@ export default function BoardsPage({ authToken, user }) {
         setColumns(mapped);
         setBoardOwnerID(detail.user_id);
         setBoardLoading(false);
-        // Load members
         try {
           const membersData = await api.getBoardMembers(boardId, authToken);
           setBoardMembers(membersData || []);
@@ -231,7 +223,6 @@ export default function BoardsPage({ authToken, user }) {
     return () => { cancelled = true; };
   }, [authToken, boardId]);
 
-  // Drag and drop handler
   const handleDragEnd = useCallback((result) => {
     const { destination, source, type } = result;
     if (!destination) return;
@@ -252,7 +243,6 @@ export default function BoardsPage({ authToken, user }) {
       if (sourceColIndex === -1 || destColIndex === -1) return cols;
       const next = moveCardBetweenColumns(cols, sourceColIndex, destColIndex, source.index, destination.index);
 
-      // Update card in API
       const sourceCol = cols[sourceColIndex];
       const movingCard = sourceCol?.cards[source.index];
       const destColumn = next[destColIndex];
@@ -275,7 +265,6 @@ export default function BoardsPage({ authToken, user }) {
     });
   }, [authToken]);
 
-  // Composer handlers
   const openComposer = useCallback((columnId) => {
     setComposerError(null);
     setComposerFor(columnId);
@@ -315,7 +304,6 @@ export default function BoardsPage({ authToken, user }) {
     }
   };
 
-  // Card editor handlers
   const openCardEditor = async (card, columnId) => {
     setEditingCard({ cardId: card.id, columnId });
     setEditingTitle(card.title);
@@ -441,7 +429,6 @@ export default function BoardsPage({ authToken, user }) {
     } catch { /* ignore */ }
   };
 
-  // Loading state
   if (boardLoading) {
     return (
       <>
@@ -456,7 +443,6 @@ export default function BoardsPage({ authToken, user }) {
     );
   }
 
-  // Error state
   if (boardError) {
     return (
       <>
@@ -473,7 +459,6 @@ export default function BoardsPage({ authToken, user }) {
     );
   }
 
-  // Auth required
   if (!authToken) {
     return (
       <>
@@ -743,7 +728,6 @@ export default function BoardsPage({ authToken, user }) {
           currentUserEmail={user?.email}
           onClose={() => {
             setShowShareModal(false);
-            // Refresh members
             api.getBoardMembers(boardId, authToken)
               .then((data) => setBoardMembers(data || []))
               .catch(() => { });
@@ -754,7 +738,6 @@ export default function BoardsPage({ authToken, user }) {
   );
 }
 
-// ============ Card Composer ============
 function CardComposer({ onAdd, onCancel, error }) {
   const inputRef = useRef(null);
   const [value, setValue] = useState('');
@@ -770,7 +753,6 @@ function CardComposer({ onAdd, onCancel, error }) {
       await onAdd?.(trimmed);
       setValue('');
     } catch {
-      // Error handled by parent
     }
   };
 
@@ -809,7 +791,6 @@ function CardComposer({ onAdd, onCancel, error }) {
   );
 }
 
-// ============ Card Edit Modal ============
 function CardEditModal({
   title, description, tags, comments, members, dueDate, activities, boardMembers,
   loading, saving, error, user,
@@ -819,7 +800,7 @@ function CardEditModal({
 }) {
   const ref = useRef(null);
   const commentsEndRef = useRef(null);
-  const [customTagName, setCustomTagName] = useState('');
+
   const [commentDraft, setCommentDraft] = useState('');
   const [activeSection, setActiveSection] = useState('details');
 
@@ -835,12 +816,7 @@ function CardEditModal({
     commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [comments, activeSection]);
 
-  const handleAddCustomTag = () => {
-    const name = customTagName.trim();
-    if (!name) return;
-    onAddTag?.(name, 'primary');
-    setCustomTagName('');
-  };
+
 
   const handlePostComment = () => {
     const content = commentDraft.trim();
