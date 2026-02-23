@@ -3,7 +3,9 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -40,7 +42,14 @@ type ErrorResponse struct {
 	Error string `json:"error"`
 }
 
-var jwtSecret = []byte("your-secret-key-change-in-production")
+var jwtSecret = func() []byte {
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		log.Println("WARNING: JWT_SECRET env var is not set — using insecure default. Set it in production!")
+		secret = "your-secret-key-change-in-production"
+	}
+	return []byte(secret)
+}()
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
