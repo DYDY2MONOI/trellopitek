@@ -621,21 +621,25 @@ export default function BoardsPage({ authToken, user }) {
                                                 {tag.name}
                                               </span>
                                             ))}
-                                            {card.members && card.members.slice(0, 3).map((m) => (
-                                              <div
-                                                key={m.id}
-                                                className="board-card__member-avatar"
-                                                title={m.user_email}
-                                                style={{
-                                                  width: '24px', height: '24px', borderRadius: '50%',
-                                                  background: '#cbd5e1', display: 'flex', alignItems: 'center',
-                                                  justifyContent: 'center', fontSize: '10px', fontWeight: 'bold',
-                                                  marginLeft: '-8px', border: '2px solid white'
-                                                }}
-                                              >
-                                                {(m.user_email || '?').slice(0, 2).toUpperCase()}
+                                            {card.members && card.members.length > 0 && (
+                                              <div className="board-card__members">
+                                                {card.members.slice(0, 4).map((m, idx) => (
+                                                  <div
+                                                    key={m.id}
+                                                    className="board-card__member-avatar"
+                                                    title={m.user_email}
+                                                    style={{ zIndex: 4 - idx }}
+                                                  >
+                                                    {(m.user_email || '?').slice(0, 2).toUpperCase()}
+                                                  </div>
+                                                ))}
+                                                {card.members.length > 4 && (
+                                                  <div className="board-card__member-more">
+                                                    +{card.members.length - 4}
+                                                  </div>
+                                                )}
                                               </div>
-                                            ))}
+                                            )}
                                           </div>
                                         )}
                                         <div className="board-card__footer">
@@ -905,45 +909,29 @@ function CardEditModal({
                     />
                   </div>
 
-                  {/* Due Date & Members Row */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                    <div className="card-modal__section">
-                      <label className="card-modal__label">Due Date</label>
-                      <input
-                        type="date"
-                        className="card-modal__date-input"
-                        style={{ width: '100%', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px' }}
-                        value={dueDate ? new Date(dueDate).toISOString().split('T')[0] : ''}
-                        onChange={(e) => onDueDateChange?.(e.target.value ? new Date(e.target.value).toISOString() : null)}
-                      />
-                    </div>
-                    <div className="card-modal__section">
-                      <label className="card-modal__label">Members</label>
-                      <div className="card-modal__members-list" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                        {members && members.map(m => (
-                          <div key={m.id} className="card-modal__member-chip" style={{ background: '#f1f5f9', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span>{(m.user_email || '').split('@')[0]}</span>
-                            <button onClick={() => onRemoveMember?.(m.user_id)} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0 }}><Icons.X /></button>
-                          </div>
-                        ))}
-                        <select
-                          className="card-modal__member-select"
-                          style={{ padding: '2px 8px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px', background: 'white' }}
-                          onChange={(e) => {
-                            if (e.target.value) onAddMember?.(parseInt(e.target.value));
-                            e.target.value = '';
-                          }}
-                        >
-                          <option value="">+ Add Member</option>
-                          {boardMembers && boardMembers
-                            .filter(bm => !members?.some(m => m.user_id === bm.user_id))
-                            .map(bm => (
-                              <option key={bm.user_id} value={bm.user_id}>{bm.email}</option>
-                            ))
-                          }
-                        </select>
-                      </div>
-                    </div>
+                  {/* Due Date */}
+                  <div className="card-modal__section">
+                    <label className="card-modal__label">Due Date</label>
+                    <input
+                      type="date"
+                      className="card-modal__date-input"
+                      value={dueDate ? new Date(dueDate).toISOString().split('T')[0] : ''}
+                      onChange={(e) => onDueDateChange?.(e.target.value ? new Date(e.target.value).toISOString() : null)}
+                    />
+                  </div>
+
+                  {/* Members Section */}
+                  <div className="card-modal__section">
+                    <label className="card-modal__label">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+                      Members
+                    </label>
+                    <MemberPicker
+                      members={members}
+                      boardMembers={boardMembers}
+                      onAdd={onAddMember}
+                      onRemove={onRemoveMember}
+                    />
                   </div>
 
                   {/* Tags Section */}
@@ -1090,6 +1078,119 @@ function CardEditModal({
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function MemberPicker({ members = [], boardMembers = [], onAdd, onRemove }) {
+  const [open, setOpen] = useState(false);
+
+  const isAssigned = (bm) =>
+    members.some((m) => m.user_id === bm.user_id);
+
+  const getInitials = (email = '') =>
+    email.slice(0, 2).toUpperCase();
+
+  const avatarColors = [
+    'linear-gradient(135deg, hsl(217 91% 60%), hsl(263 70% 50%))',
+    'linear-gradient(135deg, hsl(160 84% 39%), hsl(217 91% 60%))',
+    'linear-gradient(135deg, hsl(263 70% 50%), hsl(0 84% 60%))',
+    'linear-gradient(135deg, hsl(45 93% 47%), hsl(38 92% 50%))',
+    'linear-gradient(135deg, hsl(0 84% 60%), hsl(263 70% 50%))',
+  ];
+
+  const getColor = (email = '') => {
+    let hash = 0;
+    for (let i = 0; i < email.length; i++) hash = email.charCodeAt(i) + ((hash << 5) - hash);
+    return avatarColors[Math.abs(hash) % avatarColors.length];
+  };
+
+  return (
+    <div className="member-picker">
+      {members.length > 0 && (
+        <div className="member-picker__assigned">
+          {members.map((m) => (
+            <div key={m.id ?? m.user_id} className="member-chip" title={m.user_email}>
+              <div
+                className="member-chip__avatar"
+                style={{ background: getColor(m.user_email) }}
+              >
+                {getInitials(m.user_email)}
+              </div>
+              <span className="member-chip__name">
+                {(m.user_email || '').split('@')[0]}
+              </span>
+              <button
+                className="member-chip__remove"
+                onClick={() => onRemove?.(m.user_id)}
+                title="Remove"
+              >
+                <Icons.X />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {boardMembers.length > 0 ? (
+        <>
+          <button
+            className="member-picker__toggle"
+            onClick={() => setOpen((v) => !v)}
+          >
+            <Icons.Plus />
+            <span>{open ? 'Hide members' : 'Assign members'}</span>
+            <svg
+              className={`member-picker__chevron${open ? ' member-picker__chevron--open' : ''}`}
+              width="12" height="12" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+
+          {open && (
+            <div className="member-picker__list">
+              {boardMembers.map((bm) => {
+                const assigned = isAssigned(bm);
+                return (
+                  <button
+                    key={bm.user_id}
+                    className={`member-picker__item${assigned ? ' member-picker__item--assigned' : ''}`}
+                    onClick={() =>
+                      assigned ? onRemove?.(bm.user_id) : onAdd?.(bm.user_id)
+                    }
+                  >
+                    <div
+                      className="member-picker__item-avatar"
+                      style={{ background: getColor(bm.email) }}
+                    >
+                      {getInitials(bm.email)}
+                    </div>
+                    <div className="member-picker__item-info">
+                      <span className="member-picker__item-name">
+                        {(bm.email || '').split('@')[0]}
+                      </span>
+                      <span className="member-picker__item-email">{bm.email}</span>
+                    </div>
+                    <div className={`member-picker__item-check${assigned ? ' member-picker__item-check--active' : ''}`}>
+                      {assigned && (
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </>
+      ) : (
+        <p className="member-picker__empty">
+          No board members to assign. Invite collaborators via the Share button.
+        </p>
+      )}
     </div>
   );
 }
