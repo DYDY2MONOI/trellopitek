@@ -33,14 +33,11 @@ function AnalyticsPage({ authToken }) {
                 const data = await api.getBoards(authToken);
                 if (!cancelled) {
 
-
-                    // Calculate stats
                     let perBoardProgress = [];
                     let totalLists = 0;
                     let totalCards = 0;
                     let completedCards = 0;
 
-                    // Fetch details for each board to get lists/cards
                     const boardDetails = await Promise.all(
                         (data || []).map(board =>
                             api.getBoard(board.id, authToken).catch(() => null)
@@ -56,7 +53,6 @@ function AnalyticsPage({ authToken }) {
                                 if (list.cards) {
                                     totalCards += list.cards.length;
                                     boardCards += list.cards.length;
-                                    // Count cards in "Done" or "Completed" lists as completed
                                     if (list.title.toLowerCase().includes('done') ||
                                         list.title.toLowerCase().includes('complete')) {
                                         completedCards += list.cards.length;
@@ -64,7 +60,6 @@ function AnalyticsPage({ authToken }) {
                                     }
                                 }
                             });
-                            // Store per-board progress
                             const progress = boardCards > 0 ? Math.round((boardDone / boardCards) * 100) : 0;
                             perBoardProgress.push({
                                 id: board.id || board.ID,
@@ -97,7 +92,6 @@ function AnalyticsPage({ authToken }) {
         return () => { cancelled = true; };
     }, [authToken]);
 
-    // Board progress data from real computed values
     const boardProgress = boardProgressData.slice(0, 5).map((board, idx) => ({
         ...board,
         color: ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'][idx % 5],

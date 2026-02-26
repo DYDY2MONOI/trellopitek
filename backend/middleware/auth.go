@@ -13,10 +13,8 @@ import (
 
 var jwtSecret = func() []byte {
 	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		log.Println("WARNING: JWT_SECRET env var is not set — using insecure default. Set it in production!")
-		secret = "your-secret-key-change-in-production"
-	}
+	if secret == ""
+		secret = "tg"
 	return []byte(secret)
 }()
 

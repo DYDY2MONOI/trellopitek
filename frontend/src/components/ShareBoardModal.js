@@ -18,9 +18,8 @@ export default function ShareBoardModal({ boardId, boardOwnerId, authToken, curr
     const [searchResults, setSearchResults] = useState([]);
     const [showDropdown, setShowDropdown] = useState(false);
     const [inviting, setInviting] = useState(false);
-    const [status, setStatus] = useState(null); // { type: 'success'|'error', message }
+    const [status, setStatus] = useState(null);
 
-    // Load members
     const loadMembers = useCallback(async () => {
         if (!boardId || !authToken) return;
         try {
@@ -28,7 +27,6 @@ export default function ShareBoardModal({ boardId, boardOwnerId, authToken, curr
             const data = await api.getBoardMembers(boardId, authToken);
             setMembers(data || []);
         } catch {
-            // silently fail
         } finally {
             setMembersLoading(false);
         }
@@ -38,7 +36,6 @@ export default function ShareBoardModal({ boardId, boardOwnerId, authToken, curr
         loadMembers();
     }, [loadMembers]);
 
-    // Close on outside click or Escape
     useEffect(() => {
         const handleClickOutside = (e) => {
             if (modalRef.current && !modalRef.current.contains(e.target)) {
@@ -56,7 +53,6 @@ export default function ShareBoardModal({ boardId, boardOwnerId, authToken, curr
         };
     }, [onClose]);
 
-    // Debounced search
     useEffect(() => {
         if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
 
@@ -69,7 +65,6 @@ export default function ShareBoardModal({ boardId, boardOwnerId, authToken, curr
         searchTimerRef.current = setTimeout(async () => {
             try {
                 const users = await api.searchUsers(searchQuery.trim(), authToken);
-                // Filter out users who are already members
                 const memberIds = new Set(members.map((m) => m.user_id));
                 const filtered = (users || []).filter((u) => !memberIds.has(u.id));
                 setSearchResults(filtered);

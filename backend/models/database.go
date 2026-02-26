@@ -97,7 +97,6 @@ func InitDB() (*sql.DB, error) {
         return nil, err
     }
 
-    // Add description column if it doesn't exist
     _, _ = db.Exec(`ALTER TABLE cards ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''`)
 
     createCardTagsTableSQL := `
@@ -150,7 +149,6 @@ func InitDB() (*sql.DB, error) {
         return nil, err
     }
 
-    // Add due_date column if it doesn't exist
     _, _ = db.Exec(`ALTER TABLE cards ADD COLUMN IF NOT EXISTS due_date TIMESTAMPTZ`)
 
     createCardMembersTableSQL := `

@@ -1,7 +1,3 @@
-// UI Component Library - Epitrello
-// Inspired by shadcn/ui
-
-// Export all UI components
 export { Button } from './Button';
 export { Avatar, AvatarGroup } from './Avatar';
 export { Badge, PriorityBadge, StatusBadge } from './Badge';

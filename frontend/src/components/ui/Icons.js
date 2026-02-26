@@ -1,11 +1,5 @@
 import React from 'react';
 
-/**
- * Icon Components - Clean SVG icons for the application
- * Replaces emojis for better consistency and scaling
- */
-
-// Layout / Navigation Icons
 export const BoardIcon = ({ size = 18, className = '' }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
         <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -47,7 +41,6 @@ export const TargetIcon = ({ size = 18, className = '' }) => (
     </svg>
 );
 
-// Analytics Icons
 export const TrendingUpIcon = ({ size = 18, className = '' }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
         <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
@@ -79,7 +72,6 @@ export const ClockIcon = ({ size = 18, className = '' }) => (
     </svg>
 );
 
-// Settings Icons
 export const UserIcon = ({ size = 18, className = '' }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -138,14 +130,12 @@ export const MoonIcon = ({ size = 18, className = '' }) => (
     </svg>
 );
 
-// Check Icon
 export const CheckIcon = ({ size = 18, className = '' }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
         <polyline points="20 6 9 17 4 12" />
     </svg>
 );
 
-// Feature Icons
 export const ZapIcon = ({ size = 18, className = '' }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
@@ -176,7 +166,6 @@ export const BarChartIcon = ({ size = 18, className = '' }) => (
     </svg>
 );
 
-// Default export for convenience
 const Icons = {
     Board: BoardIcon,
     List: ListIcon,

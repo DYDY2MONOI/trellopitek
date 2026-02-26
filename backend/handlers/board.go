@@ -42,7 +42,6 @@ func (h *BoardHandler) ListBoards(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	userID := r.Context().Value("userID").(int)
 
-	// Get boards owned by user AND boards shared with user
 	rows, err := h.Boards.DB.Query(
 		`SELECT DISTINCT b.id, b.user_id, b.title, b.created_at
 		 FROM boards b
@@ -96,7 +95,6 @@ func (h *BoardHandler) GetBoard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check access: owner or member
 	if b.UserID != userID {
 		isMember, err := h.BoardMembers.IsMember(id, userID)
 		if err != nil || !isMember {
@@ -192,7 +190,6 @@ func (h *BoardHandler) CreateBoard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Add creator as owner in board_members
 	_, _ = h.BoardMembers.AddMember(b.ID, userID, "owner")
 
 	defaults := []struct{ Title, Accent string }{
@@ -248,7 +245,6 @@ func (h *BoardHandler) CreateCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Log activity
 	userID := r.Context().Value("userID").(int)
 	h.Activities.LogActivity(&card.ID, userID, "create_card", "created this card in list "+l.Title)
 
@@ -362,7 +358,6 @@ func (h *BoardHandler) UpdateCard(w http.ResponseWriter, r *http.Request) {
 			newDueDate = &t
 		}
 	} else if existing.DueDate != nil && body.DueDate != nil && *body.DueDate == "" {
-		// Cleared due date
 		newDueDate = nil
 	} else {
 		newDueDate = existing.DueDate
@@ -374,17 +369,14 @@ func (h *BoardHandler) UpdateCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Log activities
 	userID := r.Context().Value("userID").(int)
 	if newListID != existing.ListID {
-		// Fetch list names
 		oldList, _ := h.Lists.GetListByID(existing.ListID)
 		newList, _ := h.Lists.GetListByID(newListID)
 		if oldList != nil && newList != nil {
 			h.Activities.LogActivity(&id, userID, "move_card", "moved this card from "+oldList.Title+" to "+newList.Title)
 		}
 	}
-	// Simplified logging for other changes
 	if newTitle != existing.Title {
 		h.Activities.LogActivity(&id, userID, "update_card", "renamed this card")
 	}
@@ -392,7 +384,6 @@ func (h *BoardHandler) UpdateCard(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(updated)
 }
 
-// ============ Card Members Endpoints ============
 
 func (h *BoardHandler) AddCardMember(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -422,7 +413,6 @@ func (h *BoardHandler) AddCardMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Log activity
 	invitedUser, _ := h.Users.GetUserByID(body.UserID)
 	email := "someone"
 	if invitedUser != nil {
@@ -430,7 +420,6 @@ func (h *BoardHandler) AddCardMember(w http.ResponseWriter, r *http.Request) {
 	}
 	h.Activities.LogActivity(&cardID, userID, "add_member", "assigned "+email+" to this card")
 
-	// Return updated members
 	members, _ := h.CardMembers.GetMembersByCard(cardID)
 	json.NewEncoder(w).Encode(members)
 }
@@ -455,7 +444,6 @@ func (h *BoardHandler) RemoveCardMember(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Log activity
 	removedUser, _ := h.Users.GetUserByID(memberID)
 	email := "someone"
 	if removedUser != nil {
@@ -467,7 +455,6 @@ func (h *BoardHandler) RemoveCardMember(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(map[string]string{"message": "Member removed"})
 }
 
-// ============ Card Activities Endpoints ============
 
 func (h *BoardHandler) GetCardActivities(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -489,7 +476,6 @@ func (h *BoardHandler) GetCardActivities(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(activities)
 }
 
-// ============ Card Tags Endpoints ============
 
 func (h *BoardHandler) AddCardTag(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -500,7 +486,6 @@ func (h *BoardHandler) AddCardTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify card exists
 	if _, err := h.Cards.GetCardByID(cardID); err != nil {
 		http.Error(w, "card not found", http.StatusNotFound)
 		return
@@ -545,7 +530,6 @@ func (h *BoardHandler) RemoveCardTag(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"message": "Tag removed"})
 }
 
-// ============ Card Comments Endpoints ============
 
 func (h *BoardHandler) GetCardComments(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -577,7 +561,6 @@ func (h *BoardHandler) AddCardComment(w http.ResponseWriter, r *http.Request) {
 	}
 	userID := r.Context().Value("userID").(int)
 
-	// Verify card exists
 	if _, err := h.Cards.GetCardByID(cardID); err != nil {
 		http.Error(w, "card not found", http.StatusNotFound)
 		return
@@ -600,7 +583,6 @@ func (h *BoardHandler) AddCardComment(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(comment)
 }
 
-// ============ Collaboration Endpoints ============
 
 func (h *BoardHandler) GetBoardMembers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -613,7 +595,6 @@ func (h *BoardHandler) GetBoardMembers(w http.ResponseWriter, r *http.Request) {
 
 	userID := r.Context().Value("userID").(int)
 
-	// Verify the user has access to this board
 	board, err := h.Boards.GetBoardByID(boardID)
 	if err != nil {
 		http.Error(w, "board not found", http.StatusNotFound)
@@ -649,7 +630,6 @@ func (h *BoardHandler) InviteMember(w http.ResponseWriter, r *http.Request) {
 
 	userID := r.Context().Value("userID").(int)
 
-	// Only the board owner can invite members
 	board, err := h.Boards.GetBoardByID(boardID)
 	if err != nil {
 		http.Error(w, "board not found", http.StatusNotFound)
@@ -668,7 +648,6 @@ func (h *BoardHandler) InviteMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Find the user by email
 	invitedUser, _, err := h.Users.GetUserByEmail(body.Email)
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
@@ -676,14 +655,12 @@ func (h *BoardHandler) InviteMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Can't invite yourself
 	if invitedUser.ID == userID {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "You cannot invite yourself"})
 		return
 	}
 
-	// Check if already a member
 	isMember, _ := h.BoardMembers.IsMember(boardID, invitedUser.ID)
 	if isMember {
 		w.WriteHeader(http.StatusConflict)
@@ -716,7 +693,6 @@ func (h *BoardHandler) RemoveMember(w http.ResponseWriter, r *http.Request) {
 
 	userID := r.Context().Value("userID").(int)
 
-	// Only the board owner can remove members
 	board, err := h.Boards.GetBoardByID(boardID)
 	if err != nil {
 		http.Error(w, "board not found", http.StatusNotFound)
@@ -727,7 +703,6 @@ func (h *BoardHandler) RemoveMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Can't remove the owner
 	if memberUserID == userID {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Cannot remove the board owner"})

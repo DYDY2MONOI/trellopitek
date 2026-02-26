@@ -9,7 +9,7 @@ type CardMember struct {
 	ID        int       `json:"id"`
 	CardID    int       `json:"card_id"`
 	UserID    int       `json:"user_id"`
-	UserEmail string    `json:"user_email"` // Join with users table
+	UserEmail string    `json:"user_email"`
 	CreatedAt time.Time `json:"created_at"`
 }
 

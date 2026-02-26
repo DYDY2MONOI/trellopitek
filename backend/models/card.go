@@ -44,7 +44,6 @@ func (s *CardService) GetCardByID(id int) (*Card, error) {
 		c.DueDate = &dueDate.Time
 	}
 	
-	// Fetch Members
 	memberService := &CardMemberService{DB: s.DB}
 	members, err := memberService.GetMembersByCard(id)
 	if err == nil {
@@ -73,7 +72,6 @@ func (s *CardService) GetCardsByList(listID int) ([]Card, error) {
 			c.DueDate = &dueDate.Time
 		}
 		
-		// Ideally we would do a join or batch fetch, but for now individual fetch is fine for MVP
 		members, err := memberService.GetMembersByCard(c.ID)
 		if err == nil {
 			c.Members = members

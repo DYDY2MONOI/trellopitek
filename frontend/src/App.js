@@ -1,11 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 
-// Design System & Components
 import './index.css';
 import './App.css';
 
-// Layout Components
 import { AppSidebar } from './components/layout/AppSidebar';
 import { MainLayout, PageHeader, PageContent } from './components/layout/MainLayout';
 import { Button } from './components/ui/Button';
@@ -15,19 +13,15 @@ import { Badge } from './components/ui/Badge';
 import { Avatar, AvatarGroup } from './components/ui/Avatar';
 import { ClipboardIcon, ZapIcon, BarChartIcon, SunIcon, MoonIcon, UsersIcon } from './components/ui/Icons';
 
-// Pages
 import BoardsPage from './pages/BoardsPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import SettingsPage from './pages/SettingsPage';
 
-// Services
 import { getAuthToken, setAuthToken, api } from './services/api';
 
-// Auth Components
 import Login from './components/Login';
 import Register from './components/Register';
 
-// Constants
 const THEME_STORAGE_KEY = 'epitrello-theme';
 
 const getStoredTheme = () => {
@@ -36,7 +30,6 @@ const getStoredTheme = () => {
   return stored === 'dark' ? 'dark' : 'light';
 };
 
-// ============ Main App ============
 function App() {
   const [theme, setTheme] = useState(() => getStoredTheme());
   const [user, setUser] = useState(null);
@@ -48,14 +41,12 @@ function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Theme handling
   useEffect(() => {
     const nextTheme = theme === 'dark' ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', nextTheme);
     try {
       window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
     } catch (error) {
-      // Ignore storage errors
     }
   }, [theme]);
 
@@ -63,7 +54,6 @@ function App() {
     setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
   }, []);
 
-  // JWT decode helper
   const decodeJwt = (token) => {
     try {
       const base64Url = token.split('.')[1];
@@ -81,7 +71,6 @@ function App() {
     }
   };
 
-  // Verify token on mount
   useEffect(() => {
     const savedToken = getAuthToken();
     if (savedToken) {
@@ -110,7 +99,6 @@ function App() {
     }
   };
 
-  // Fetch boards when authenticated
   useEffect(() => {
     if (!authTokenState) {
       setBoards([]);
@@ -122,13 +110,11 @@ function App() {
         const data = await api.getBoards(authTokenState);
         if (!cancelled) setBoards(data || []);
       } catch (e) {
-        // Silently fail
       }
     })();
     return () => { cancelled = true; };
   }, [authTokenState]);
 
-  // Auth handlers
   const handleLogin = (userData, authToken) => {
     setUser(userData);
     setIsAuthenticated(true);
@@ -158,10 +144,8 @@ function App() {
   const openRegisterPage = () => setAuthView('register');
   const closeAuthPage = () => setAuthView(null);
 
-  // Check if we're in the app section (needs sidebar)
   const isAppSection = location.pathname.startsWith('/user/');
 
-  // Auth pages (Login/Register)
   if (!isAuthenticated && authView) {
     return (
       <div className="auth-wrapper">
@@ -182,7 +166,6 @@ function App() {
     );
   }
 
-  // App section with sidebar
   if (isAppSection) {
     return (
       <MainLayout
@@ -244,7 +227,6 @@ function App() {
     );
   }
 
-  // Landing page
   return (
     <div className="landing-wrapper">
       <LandingPage
@@ -261,7 +243,6 @@ function App() {
   );
 }
 
-// ============ Landing Page ============
 function LandingPage({
   theme,
   onToggleTheme,
@@ -403,7 +384,6 @@ function LandingPage({
   );
 }
 
-// ============ Board Preview (for landing page) ============
 function BoardPreview() {
   const columns = [
     { title: 'Ideas', color: 'accent', cards: ['Launch landing page', 'Create onboarding flow'] },
@@ -445,7 +425,6 @@ function BoardPreview() {
   );
 }
 
-// ============ Boards Index Page ============
 function BoardsIndexPage({ authToken, boards, setBoards, user }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -623,7 +602,6 @@ function BoardsIndexPage({ authToken, boards, setBoards, user }) {
   );
 }
 
-// ============ Templates Gallery Page ============
 function TemplatesGalleryPage({ authToken }) {
   const navigate = useNavigate();
   const [error, setError] = useState(null);
@@ -747,7 +725,6 @@ function TemplatesGalleryPage({ authToken }) {
   );
 }
 
-// ============ App with Router ============
 export default function AppWithRouter() {
   return (
     <Router>
