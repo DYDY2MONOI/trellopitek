@@ -3,18 +3,17 @@ package middleware
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"net/http"
 	"os"
 	"strings"
-
 	"github.com/golang-jwt/jwt/v5"
 )
 
 var jwtSecret = func() []byte {
 	secret := os.Getenv("JWT_SECRET")
-	if secret == ""
-		secret = "tg"
+	if secret == "" {
+		secret = "salut j'aime dylan"
+	}
 	return []byte(secret)
 }()
 
